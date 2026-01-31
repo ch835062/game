@@ -2,7 +2,8 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <title>彩色打磚塊（幼兒版）</title>
+  <title>彩色打磚塊（幼兒版｜手機搖晃）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     body {
       background: #f0f8ff;
@@ -10,62 +11,66 @@
       text-align: center;
       margin: 0;
       padding: 0;
+      user-select: none;
     }
-    h1 { color: #ff6f61; }
-    #gameArea { margin: 0 auto; width: 480px; }
+    h1 { color: #ff6f61; margin-top: 10px; }
+    .info { font-size: 18px; margin: 6px; }
     canvas {
       background: #ffffff;
-      border: 6px solid #4caf50;
-      border-radius: 12px;
-      touch-action: none;
+      border: 5px solid #4caf50;
+      border-radius: 14px;
+      display: block;
+      margin: 0 auto;
     }
-    .info { font-size: 20px; margin: 8px; }
     button {
-      font-size: 20px;
+      font-size: 18px;
       padding: 10px 20px;
-      border-radius: 12px;
+      border-radius: 14px;
       border: none;
       background: #ffcc00;
       cursor: pointer;
+      margin: 8px;
     }
-    button:hover { background: #ffb300; }
   </style>
 </head>
 <body>
-  <h1>🌈 彩色打磚塊 🌈</h1>
+  <h1>📱 搖一搖打磚塊 🌈</h1>
   <div class="info">分數：<span id="score">0</span></div>
-  <div id="gameArea">
-    <canvas id="gameCanvas" width="480" height="320"></canvas>
-  </div>
-  <br />
+  <div class="info">左右搖晃手機來移動擋板</div>
+  <canvas id="gameCanvas"></canvas>
   <button id="startBtn">▶ 開始 / 重新開始</button>
 
 <script>
-// 確保 DOM 完全載入後才執行（避免某些瀏覽器出錯）
 window.onload = function () {
   var canvas = document.getElementById("gameCanvas");
   var ctx = canvas.getContext("2d");
   var startBtn = document.getElementById("startBtn");
 
-  var ball = null;
-  var paddle = null;
-  var bricks = [];
+  // 手機自適應尺寸
+  function resizeCanvas() {
+    canvas.width = Math.min(window.innerWidth - 20, 480);
+    canvas.height = Math.min(window.innerHeight * 0.55, 360);
+  }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  var ball, paddle, bricks;
   var score = 0;
   var gameRunning = false;
 
   var brickRowCount = 3;
   var brickColumnCount = 5;
-  var brickWidth = 80;
-  var brickHeight = 30;
-  var brickPadding = 10;
-  var brickOffsetTop = 40;
-  var brickOffsetLeft = 20;
+  var brickPadding = 8;
+  var brickOffsetTop = 30;
+  var brickOffsetLeft = 10;
+
+  var tiltX = 0; // 手機傾斜值
 
   function initPaddle() {
     paddle = {
-      width: 100,
-      height: 16,
-      x: (canvas.width - 100) / 2
+      width: canvas.width * 0.28,
+      height: 14,
+      x: (canvas.width - canvas.width * 0.28) / 2
     };
   }
 
@@ -76,10 +81,10 @@ window.onload = function () {
 
     ball = {
       x: canvas.width / 2,
-      y: canvas.height - 60,
+      y: canvas.height - 50,
       dx: 2,
       dy: -2,
-      radius: 10
+      radius: 9
     };
 
     initPaddle();
@@ -96,32 +101,33 @@ window.onload = function () {
   }
 
   function drawBall() {
-    if (!ball) return;
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ff5722";
+    ctx.fillStyle = "#ff7043";
     ctx.fill();
     ctx.closePath();
   }
 
   function drawPaddle() {
-    if (!paddle) return;
     ctx.beginPath();
-    ctx.rect(paddle.x, canvas.height - paddle.height, paddle.width, paddle.height);
-    ctx.fillStyle = "#2196f3";
+    ctx.rect(paddle.x, canvas.height - paddle.height - 6, paddle.width, paddle.height);
+    ctx.fillStyle = "#42a5f5";
     ctx.fill();
     ctx.closePath();
   }
 
   function drawBricks() {
     var colors = ["#ff8a80", "#ffd180", "#ffff8d", "#ccff90", "#80d8ff"];
+    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
+    var brickHeight = 24;
+
     for (var c = 0; c < brickColumnCount; c++) {
       for (var r = 0; r < brickRowCount; r++) {
-        if (bricks[c] && bricks[c][r] && bricks[c][r].status === 1) {
-          var brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
-          var brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+        if (bricks[c][r].status === 1) {
+          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var y = brickOffsetTop + r * (brickHeight + brickPadding);
           ctx.beginPath();
-          ctx.rect(brickX, brickY, brickWidth, brickHeight);
+          ctx.rect(x, y, brickWidth, brickHeight);
           ctx.fillStyle = colors[c % colors.length];
           ctx.fill();
           ctx.closePath();
@@ -131,18 +137,18 @@ window.onload = function () {
   }
 
   function collisionDetection() {
-    if (!ball) return;
+    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
+    var brickHeight = 24;
+
     for (var c = 0; c < brickColumnCount; c++) {
       for (var r = 0; r < brickRowCount; r++) {
         var b = bricks[c][r];
-        if (b && b.status === 1) {
-          var brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
-          var brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+        if (b.status === 1) {
+          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var y = brickOffsetTop + r * (brickHeight + brickPadding);
           if (
-            ball.x > brickX &&
-            ball.x < brickX + brickWidth &&
-            ball.y > brickY &&
-            ball.y < brickY + brickHeight
+            ball.x > x && ball.x < x + brickWidth &&
+            ball.y > y && ball.y < y + brickHeight
           ) {
             ball.dy = -ball.dy;
             b.status = 0;
@@ -154,6 +160,14 @@ window.onload = function () {
     }
   }
 
+  function updatePaddleByTilt() {
+    paddle.x += tiltX * 1.5;
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.width > canvas.width) {
+      paddle.x = canvas.width - paddle.width;
+    }
+  }
+
   function draw() {
     if (!gameRunning) return;
 
@@ -162,6 +176,8 @@ window.onload = function () {
     drawBall();
     drawPaddle();
     collisionDetection();
+
+    updatePaddleByTilt();
 
     if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
       ball.dx = -ball.dx;
@@ -184,30 +200,25 @@ window.onload = function () {
     requestAnimationFrame(draw);
   }
 
-  canvas.addEventListener("mousemove", function (e) {
-    if (!paddle) return;
-    var rect = canvas.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    paddle.x = x - paddle.width / 2;
-    if (paddle.x < 0) paddle.x = 0;
-    if (paddle.x + paddle.width > canvas.width) {
-      paddle.x = canvas.width - paddle.width;
+  // 手機傾斜控制（左右）
+  window.addEventListener("deviceorientation", function (event) {
+    if (event.gamma !== null) {
+      tiltX = event.gamma / 10; // 靈敏度調整
     }
   });
 
-  canvas.addEventListener("touchmove", function (e) {
-    if (!paddle) return;
-    e.preventDefault();
-    var rect = canvas.getBoundingClientRect();
-    var x = e.touches[0].clientX - rect.left;
-    paddle.x = x - paddle.width / 2;
-    if (paddle.x < 0) paddle.x = 0;
-    if (paddle.x + paddle.width > canvas.width) {
-      paddle.x = canvas.width - paddle.width;
+  // iOS 需要使用者手動授權
+  startBtn.onclick = function () {
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      DeviceOrientationEvent.requestPermission().then(function (response) {
+        if (response === "granted") startGame();
+        else alert("需要允許感測器才能玩喔！");
+      });
+    } else {
+      startGame();
     }
-  }, { passive: false });
-
-  startBtn.onclick = startGame;
+  };
 };
 </script>
 </body>
