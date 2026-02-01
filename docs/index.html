@@ -1,226 +1,264 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>打磚塊遊戲</title>
-<style>
-body {
-  margin: 0;
-  background: #111;
-  color: #fff;
-  text-align: center;
-  font-family: Arial, sans-serif;
-}
-canvas {
-  background: #000;
-  display: block;
-  margin: auto;
-  border: 2px solid #444;
-}
-#info {
-  padding: 6px;
-  font-size: 14px;
-}
-</style>
+  <meta charset="UTF-8" />
+  <title>彩色打磚塊（幼兒版｜手機搖晃）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <style>
+    body {
+      background: #f0f8ff;
+      font-family: "Arial Rounded MT Bold", "Noto Sans TC", sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    h1 { color: #ff6f61; margin-top: 10px; }
+    .info { font-size: 18px; margin: 6px; }
+    canvas {
+      background: #ffffff;
+      border: 5px solid #4caf50;
+      border-radius: 14px;
+      display: block;
+      margin: 0 auto;
+    }
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      border-radius: 14px;
+      border: none;
+      background: #ffcc00;
+      cursor: pointer;
+      margin: 8px;
+    }
+  </style>
 </head>
 <body>
-
-<h2>🧱 打磚塊遊戲</h2>
-<div id="info">手機可搖晃控制｜桌機滑鼠或方向鍵</div>
-<canvas id="game" width="360" height="520"></canvas>
+  <h1>📱 搖一搖打磚塊 🌈</h1>
+  <div class="info">分數：<span id="score">0</span></div>
+  <div class="info">左右搖晃手機來移動擋板</div>
+  <canvas id="gameCanvas"></canvas>
+  <button id="startBtn">▶ 開始 / 重新開始</button>
 
 <script>
-/* ===== 基本設定 ===== */
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+window.onload = function () {
+  var canvas = document.getElementById("gameCanvas");
+  var ctx = canvas.getContext("2d");
+  var startBtn = document.getElementById("startBtn");
 
-let paddle = { x: 140, y: 480, w: 80, h: 12 };
-let balls = [];
-let items = [];
-let score = 0;
-let gameOver = false;
+  // ===== 音效系統（Web Audio API） =====
+  var audioCtx = null;
 
-/* ===== 音效 ===== */
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playSound(freq, duration = 0.1) {
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.frequency.value = freq;
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-  osc.stop(audioCtx.currentTime + duration);
-}
-
-/* ===== 球 ===== */
-function createBall(x, y, speed = 3) {
-  balls.push({ x, y, vx: speed, vy: -speed, r: 6 });
-}
-createBall(180, 450);
-
-/* ===== 磚塊 ===== */
-let bricks = [];
-const rows = 5, cols = 7;
-for (let r = 0; r < rows; r++) {
-  for (let c = 0; c < cols; c++) {
-    bricks.push({
-      x: 20 + c * 45,
-      y: 40 + r * 25,
-      w: 40,
-      h: 15,
-      alive: true
-    });
-  }
-}
-
-/* ===== 道具 ===== */
-function dropItem(x, y) {
-  const types = ["multi", "long", "slow", "fast"];
-  items.push({
-    x, y, type: types[Math.floor(Math.random() * types.length)],
-    size: 12
-  });
-}
-
-function applyItem(type) {
-  playSound(600);
-  if (type === "multi") {
-    balls.forEach(b => createBall(b.x, b.y, 3));
-  }
-  if (type === "long") {
-    paddle.w = 140;
-    setTimeout(() => paddle.w = 80, 8000);
-  }
-  if (type === "slow") {
-    balls.forEach(b => { b.vx *= 0.6; b.vy *= 0.6; });
-  }
-  if (type === "fast") {
-    balls.forEach(b => { b.vx *= 1.4; b.vy *= 1.4; });
-  }
-}
-
-/* ===== 控制（滑鼠） ===== */
-canvas.addEventListener("mousemove", e => {
-  const rect = canvas.getBoundingClientRect();
-  paddle.x = e.clientX - rect.left - paddle.w / 2;
-});
-
-/* ===== 控制（鍵盤） ===== */
-document.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft") paddle.x -= 20;
-  if (e.key === "ArrowRight") paddle.x += 20;
-});
-
-/* ===== 手機搖晃控制 ===== */
-window.addEventListener("devicemotion", e => {
-  const acc = e.accelerationIncludingGravity;
-  if (!acc) return;
-  paddle.x += acc.x * 2;
-});
-
-/* ===== 遊戲更新 ===== */
-function update() {
-  if (gameOver) return;
-
-  balls.forEach(ball => {
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-
-    if (ball.x < ball.r || ball.x > canvas.width - ball.r) {
-      ball.vx *= -1;
-      playSound(300);
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (ball.y < ball.r) {
-      ball.vy *= -1;
-      playSound(300);
-    }
+  }
 
-    if (
-      ball.y + ball.r > paddle.y &&
-      ball.x > paddle.x &&
-      ball.x < paddle.x + paddle.w
-    ) {
-      ball.vy *= -1;
-      playSound(500);
-    }
+  function beep(freq, duration) {
+    if (!audioCtx) return;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
 
-    bricks.forEach(b => {
-      if (b.alive &&
-          ball.x > b.x && ball.x < b.x + b.w &&
-          ball.y > b.y && ball.y < b.y + b.h) {
-        b.alive = false;
-        ball.vy *= -1;
-        score += 10;
-        playSound(800);
-        if (Math.random() < 0.3) dropItem(b.x + b.w / 2, b.y);
+    osc.frequency.value = freq;
+    osc.type = "sine";
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioCtx.currentTime + duration
+    );
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  // 手機自適應尺寸
+  function resizeCanvas() {
+    canvas.width = Math.min(window.innerWidth - 20, 480);
+    canvas.height = Math.min(window.innerHeight * 0.55, 360);
+  }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  var ball, paddle, bricks;
+  var score = 0;
+  var gameRunning = false;
+
+  var brickRowCount = 3;
+  var brickColumnCount = 5;
+  var brickPadding = 8;
+  var brickOffsetTop = 30;
+  var brickOffsetLeft = 10;
+
+  var tiltX = 0;
+
+  function initPaddle() {
+    paddle = {
+      width: canvas.width * 0.28,
+      height: 14,
+      x: (canvas.width - canvas.width * 0.28) / 2
+    };
+  }
+
+  function startGame() {
+    score = 0;
+    document.getElementById("score").innerText = score;
+    gameRunning = true;
+
+    ball = {
+      x: canvas.width / 2,
+      y: canvas.height - 50,
+      dx: 2,
+      dy: -2,
+      radius: 9
+    };
+
+    initPaddle();
+
+    bricks = [];
+    for (var c = 0; c < brickColumnCount; c++) {
+      bricks[c] = [];
+      for (var r = 0; r < brickRowCount; r++) {
+        bricks[c][r] = { status: 1 };
       }
-    });
-  });
-
-  balls = balls.filter(b => b.y < canvas.height + 20);
-  if (balls.length === 0) gameOver = true;
-
-  items.forEach(i => {
-    i.y += 2;
-    if (i.y > paddle.y &&
-        i.x > paddle.x &&
-        i.x < paddle.x + paddle.w) {
-      applyItem(i.type);
-      i.hit = true;
     }
-  });
-  items = items.filter(i => !i.hit);
-}
 
-/* ===== 繪圖 ===== */
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // 板子
-  ctx.fillStyle = "#0f0";
-  ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
-
-  // 球
-  ctx.fillStyle = "#fff";
-  balls.forEach(b => {
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // 磚塊
-  bricks.forEach(b => {
-    if (b.alive) {
-      ctx.fillStyle = "#f44";
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-    }
-  });
-
-  // 道具
-  items.forEach(i => {
-    ctx.fillStyle = "#ff0";
-    ctx.fillRect(i.x - 6, i.y - 6, 12, 12);
-  });
-
-  ctx.fillStyle = "#fff";
-  ctx.fillText("Score: " + score, 10, 15);
-
-  if (gameOver) {
-    ctx.font = "24px Arial";
-    ctx.fillText("GAME OVER", 110, 260);
+    requestAnimationFrame(draw);
   }
-}
 
-/* ===== 主迴圈 ===== */
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-loop();
+  function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff7043";
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function drawPaddle() {
+    ctx.beginPath();
+    ctx.rect(paddle.x, canvas.height - paddle.height - 6, paddle.width, paddle.height);
+    ctx.fillStyle = "#42a5f5";
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function drawBricks() {
+    var colors = ["#ff8a80", "#ffd180", "#ffff8d", "#ccff90", "#80d8ff"];
+    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
+    var brickHeight = 24;
+
+    for (var c = 0; c < brickColumnCount; c++) {
+      for (var r = 0; r < brickRowCount; r++) {
+        if (bricks[c][r].status === 1) {
+          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var y = brickOffsetTop + r * (brickHeight + brickPadding);
+          ctx.beginPath();
+          ctx.rect(x, y, brickWidth, brickHeight);
+          ctx.fillStyle = colors[c % colors.length];
+          ctx.fill();
+          ctx.closePath();
+        }
+      }
+    }
+  }
+
+  function collisionDetection() {
+    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
+    var brickHeight = 24;
+
+    for (var c = 0; c < brickColumnCount; c++) {
+      for (var r = 0; r < brickRowCount; r++) {
+        var b = bricks[c][r];
+        if (b.status === 1) {
+          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var y = brickOffsetTop + r * (brickHeight + brickPadding);
+          if (
+            ball.x > x && ball.x < x + brickWidth &&
+            ball.y > y && ball.y < y + brickHeight
+          ) {
+            ball.dy = -ball.dy;
+            b.status = 0;
+            score += 10;
+            document.getElementById("score").innerText = score;
+
+            // 🎵 碰撞音效（磚塊）
+            beep(600, 0.12);
+          }
+        }
+      }
+    }
+  }
+
+  function updatePaddleByTilt() {
+    paddle.x += tiltX * 1.5;
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.width > canvas.width) {
+      paddle.x = canvas.width - paddle.width;
+    }
+  }
+
+  function draw() {
+    if (!gameRunning) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBricks();
+    drawBall();
+    drawPaddle();
+    collisionDetection();
+
+    updatePaddleByTilt();
+
+    if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+      ball.dx = -ball.dx;
+      beep(400, 0.08); // 牆壁音效
+    }
+
+    if (ball.y + ball.dy < ball.radius) {
+      ball.dy = -ball.dy;
+      beep(400, 0.08);
+    } else if (ball.y + ball.dy > canvas.height - ball.radius) {
+      if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+        ball.dy = -ball.dy;
+        beep(300, 0.1); // 擋板音效
+      } else {
+        gameRunning = false;
+        beep(120, 0.5); // 失敗音效
+        alert("遊戲結束！再玩一次吧 😊");
+        return;
+      }
+    }
+
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener("deviceorientation", function (event) {
+    if (event.gamma !== null) {
+      tiltX = event.gamma / 10;
+    }
+  });
+
+  // iOS 感測器 + 音效初始化都需使用者操作
+  startBtn.onclick = function () {
+    initAudio();
+
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      DeviceOrientationEvent.requestPermission().then(function (response) {
+        if (response === "granted") startGame();
+        else alert("需要允許感測器才能玩喔！");
+      });
+    } else {
+      startGame();
+    }
+  };
+};
 </script>
-
 </body>
 </html>
