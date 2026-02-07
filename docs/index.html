@@ -3,165 +3,170 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工程車消消樂</title>
+<title>工程車消消樂 豪華版</title>
 
 <style>
 body {
     text-align: center;
-    background: #fff8dc;
+    background: linear-gradient(#aee1ff, #fff8dc);
     font-family: Arial, sans-serif;
 }
 
 h1 {
-    font-size: 36px;
+    font-size: 34px;
+}
+
+#score {
+    font-size: 24px;
+    margin: 10px;
 }
 
 #game {
     width: 360px;
     margin: auto;
     display: grid;
-    grid-template-columns: repeat(4, 90px);
-    grid-gap: 5px;
+    grid-template-columns: repeat(4, 85px);
+    gap: 8px;
 }
 
 .tile {
-    width: 90px;
-    height: 90px;
-    font-size: 50px;
+    width: 85px;
+    height: 85px;
+    font-size: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: white;
-    border-radius: 15px;
+    border-radius: 20px;
     cursor: pointer;
+    transition: 0.2s;
+}
+
+.tile:hover {
+    transform: scale(1.1);
 }
 
 .tile.selected {
     background: #ffeb3b;
 }
 
-#score {
-    font-size: 24px;
-    margin: 15px;
+.tile.hint {
+    animation: glow 1s infinite;
+}
+
+@keyframes glow {
+    0% { box-shadow: 0 0 5px orange; }
+    50% { box-shadow: 0 0 20px red; }
+    100% { box-shadow: 0 0 5px orange; }
+}
+
+.explode {
+    animation: explode 0.4s forwards;
+}
+
+@keyframes explode {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
 }
 </style>
 </head>
 
 <body>
 
-<h1>🚜 工程車消消樂 🚒</h1>
+<h1>🚜 工程車消消樂 豪華版 🚒</h1>
 <div id="score">得分：0</div>
 <div id="game"></div>
 
 <script>
-const vehicles = ["🚜", "🚒", "🚛", "🚧"];
+const vehicles = ["🚜","🚒","🚛","🚧"];
 const boardSize = 4;
 let board = [];
-let firstTile = null;
+let selectedTiles = [];
 let score = 0;
 
 const game = document.getElementById("game");
 const scoreDisplay = document.getElementById("score");
 
 function createBoard() {
-    board = [];
     game.innerHTML = "";
+    board = [];
+
     for (let i = 0; i < boardSize * boardSize; i++) {
         const tile = document.createElement("div");
         tile.classList.add("tile");
         tile.dataset.index = i;
-        tile.textContent = vehicles[Math.floor(Math.random() * vehicles.length)];
+        tile.textContent = vehicles[Math.floor(Math.random()*vehicles.length)];
         tile.addEventListener("click", selectTile);
         game.appendChild(tile);
         board.push(tile);
     }
+
+    setTimeout(showHint, 800);
 }
 
 function selectTile() {
-    if (!firstTile) {
-        firstTile = this;
-        this.classList.add("selected");
-    } else {
-        swapTiles(firstTile, this);
-        firstTile.classList.remove("selected");
-        firstTile = null;
-        checkMatches();
+    if (selectedTiles.includes(this)) return;
+
+    this.classList.add("selected");
+    selectedTiles.push(this);
+
+    if (selectedTiles.length === 3) {
+        checkMatch();
     }
 }
 
-function swapTiles(tile1, tile2) {
-    const temp = tile1.textContent;
-    tile1.textContent = tile2.textContent;
-    tile2.textContent = temp;
-}
-
-function checkMatches() {
-    let matched = false;
-
-    // 檢查橫排
-    for (let row = 0; row < boardSize; row++) {
-        for (let col = 0; col < boardSize - 2; col++) {
-            let i = row * boardSize + col;
-            if (board[i].textContent &&
-                board[i].textContent === board[i+1].textContent &&
-                board[i].textContent === board[i+2].textContent) {
-
-                board[i].textContent = "";
-                board[i+1].textContent = "";
-                board[i+2].textContent = "";
-                score += 10;
-                matched = true;
-            }
-        }
-    }
-
-    // 檢查直排
-    for (let col = 0; col < boardSize; col++) {
-        for (let row = 0; row < boardSize - 2; row++) {
-            let i = row * boardSize + col;
-            if (board[i].textContent &&
-                board[i].textContent === board[i+boardSize].textContent &&
-                board[i].textContent === board[i+boardSize*2].textContent) {
-
-                board[i].textContent = "";
-                board[i+boardSize].textContent = "";
-                board[i+boardSize*2].textContent = "";
-                score += 10;
-                matched = true;
-            }
-        }
-    }
-
-    if (matched) {
-        playSound();
+function checkMatch() {
+    const icons = selectedTiles.map(t => t.textContent);
+    if (icons[0] === icons[1] && icons[1] === icons[2]) {
+        score += 20;
         scoreDisplay.textContent = "得分：" + score;
-        setTimeout(dropTiles, 300);
+        playSuccessSound();
+
+        selectedTiles.forEach(tile=>{
+            tile.classList.add("explode");
+        });
+
+        setTimeout(()=>{
+            selectedTiles.forEach(tile=>{
+                tile.classList.remove("explode");
+                tile.textContent = vehicles[Math.floor(Math.random()*vehicles.length)];
+                tile.classList.remove("selected");
+            });
+            selectedTiles = [];
+            showHint();
+        },400);
+    } else {
+        setTimeout(()=>{
+            selectedTiles.forEach(t=>t.classList.remove("selected"));
+            selectedTiles = [];
+        },500);
     }
 }
 
-function dropTiles() {
-    for (let col = 0; col < boardSize; col++) {
-        for (let row = boardSize - 1; row >= 0; row--) {
-            let i = row * boardSize + col;
-            if (board[i].textContent === "") {
-                for (let k = row - 1; k >= 0; k--) {
-                    let above = k * boardSize + col;
-                    if (board[above].textContent !== "") {
-                        board[i].textContent = board[above].textContent;
-                        board[above].textContent = "";
-                        break;
-                    }
+function showHint() {
+    board.forEach(t=>t.classList.remove("hint"));
+
+    let counts = {};
+    board.forEach(tile=>{
+        counts[tile.textContent] = (counts[tile.textContent] || 0)+1;
+    });
+
+    for (let vehicle in counts) {
+        if (counts[vehicle] >= 3) {
+            let shown = 0;
+            board.forEach(tile=>{
+                if (tile.textContent === vehicle && shown < 3) {
+                    tile.classList.add("hint");
+                    shown++;
                 }
-                if (board[i].textContent === "") {
-                    board[i].textContent = vehicles[Math.floor(Math.random() * vehicles.length)];
-                }
-            }
+            });
+            break;
         }
     }
 }
 
-function playSound() {
-    const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+function playSuccessSound() {
+    const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
     audio.play();
 }
 
