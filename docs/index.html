@@ -1,264 +1,172 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <title>彩色打磚塊（幼兒版｜手機搖晃）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <style>
-    body {
-      background: #f0f8ff;
-      font-family: "Arial Rounded MT Bold", "Noto Sans TC", sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-    }
-    h1 { color: #ff6f61; margin-top: 10px; }
-    .info { font-size: 18px; margin: 6px; }
-    canvas {
-      background: #ffffff;
-      border: 5px solid #4caf50;
-      border-radius: 14px;
-      display: block;
-      margin: 0 auto;
-    }
-    button {
-      font-size: 18px;
-      padding: 10px 20px;
-      border-radius: 14px;
-      border: none;
-      background: #ffcc00;
-      cursor: pointer;
-      margin: 8px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程車消消樂</title>
+
+<style>
+body {
+    text-align: center;
+    background: #fff8dc;
+    font-family: Arial, sans-serif;
+}
+
+h1 {
+    font-size: 36px;
+}
+
+#game {
+    width: 360px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: repeat(4, 90px);
+    grid-gap: 5px;
+}
+
+.tile {
+    width: 90px;
+    height: 90px;
+    font-size: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 15px;
+    cursor: pointer;
+}
+
+.tile.selected {
+    background: #ffeb3b;
+}
+
+#score {
+    font-size: 24px;
+    margin: 15px;
+}
+</style>
 </head>
+
 <body>
-  <h1>📱 搖一搖打磚塊 🌈</h1>
-  <div class="info">分數：<span id="score">0</span></div>
-  <div class="info">左右搖晃手機來移動擋板</div>
-  <canvas id="gameCanvas"></canvas>
-  <button id="startBtn">▶ 開始 / 重新開始</button>
+
+<h1>🚜 工程車消消樂 🚒</h1>
+<div id="score">得分：0</div>
+<div id="game"></div>
 
 <script>
-window.onload = function () {
-  var canvas = document.getElementById("gameCanvas");
-  var ctx = canvas.getContext("2d");
-  var startBtn = document.getElementById("startBtn");
+const vehicles = ["🚜", "🚒", "🚛", "🚧"];
+const boardSize = 4;
+let board = [];
+let firstTile = null;
+let score = 0;
 
-  // ===== 音效系統（Web Audio API） =====
-  var audioCtx = null;
+const game = document.getElementById("game");
+const scoreDisplay = document.getElementById("score");
 
-  function initAudio() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function createBoard() {
+    board = [];
+    game.innerHTML = "";
+    for (let i = 0; i < boardSize * boardSize; i++) {
+        const tile = document.createElement("div");
+        tile.classList.add("tile");
+        tile.dataset.index = i;
+        tile.textContent = vehicles[Math.floor(Math.random() * vehicles.length)];
+        tile.addEventListener("click", selectTile);
+        game.appendChild(tile);
+        board.push(tile);
     }
-  }
+}
 
-  function beep(freq, duration) {
-    if (!audioCtx) return;
-    var osc = audioCtx.createOscillator();
-    var gain = audioCtx.createGain();
-
-    osc.frequency.value = freq;
-    osc.type = "sine";
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      audioCtx.currentTime + duration
-    );
-
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  }
-
-  // 手機自適應尺寸
-  function resizeCanvas() {
-    canvas.width = Math.min(window.innerWidth - 20, 480);
-    canvas.height = Math.min(window.innerHeight * 0.55, 360);
-  }
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
-
-  var ball, paddle, bricks;
-  var score = 0;
-  var gameRunning = false;
-
-  var brickRowCount = 3;
-  var brickColumnCount = 5;
-  var brickPadding = 8;
-  var brickOffsetTop = 30;
-  var brickOffsetLeft = 10;
-
-  var tiltX = 0;
-
-  function initPaddle() {
-    paddle = {
-      width: canvas.width * 0.28,
-      height: 14,
-      x: (canvas.width - canvas.width * 0.28) / 2
-    };
-  }
-
-  function startGame() {
-    score = 0;
-    document.getElementById("score").innerText = score;
-    gameRunning = true;
-
-    ball = {
-      x: canvas.width / 2,
-      y: canvas.height - 50,
-      dx: 2,
-      dy: -2,
-      radius: 9
-    };
-
-    initPaddle();
-
-    bricks = [];
-    for (var c = 0; c < brickColumnCount; c++) {
-      bricks[c] = [];
-      for (var r = 0; r < brickRowCount; r++) {
-        bricks[c][r] = { status: 1 };
-      }
-    }
-
-    requestAnimationFrame(draw);
-  }
-
-  function drawBall() {
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ff7043";
-    ctx.fill();
-    ctx.closePath();
-  }
-
-  function drawPaddle() {
-    ctx.beginPath();
-    ctx.rect(paddle.x, canvas.height - paddle.height - 6, paddle.width, paddle.height);
-    ctx.fillStyle = "#42a5f5";
-    ctx.fill();
-    ctx.closePath();
-  }
-
-  function drawBricks() {
-    var colors = ["#ff8a80", "#ffd180", "#ffff8d", "#ccff90", "#80d8ff"];
-    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
-    var brickHeight = 24;
-
-    for (var c = 0; c < brickColumnCount; c++) {
-      for (var r = 0; r < brickRowCount; r++) {
-        if (bricks[c][r].status === 1) {
-          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
-          var y = brickOffsetTop + r * (brickHeight + brickPadding);
-          ctx.beginPath();
-          ctx.rect(x, y, brickWidth, brickHeight);
-          ctx.fillStyle = colors[c % colors.length];
-          ctx.fill();
-          ctx.closePath();
-        }
-      }
-    }
-  }
-
-  function collisionDetection() {
-    var brickWidth = (canvas.width - brickOffsetLeft * 2 - brickPadding * (brickColumnCount - 1)) / brickColumnCount;
-    var brickHeight = 24;
-
-    for (var c = 0; c < brickColumnCount; c++) {
-      for (var r = 0; r < brickRowCount; r++) {
-        var b = bricks[c][r];
-        if (b.status === 1) {
-          var x = brickOffsetLeft + c * (brickWidth + brickPadding);
-          var y = brickOffsetTop + r * (brickHeight + brickPadding);
-          if (
-            ball.x > x && ball.x < x + brickWidth &&
-            ball.y > y && ball.y < y + brickHeight
-          ) {
-            ball.dy = -ball.dy;
-            b.status = 0;
-            score += 10;
-            document.getElementById("score").innerText = score;
-
-            // 🎵 碰撞音效（磚塊）
-            beep(600, 0.12);
-          }
-        }
-      }
-    }
-  }
-
-  function updatePaddleByTilt() {
-    paddle.x += tiltX * 1.5;
-    if (paddle.x < 0) paddle.x = 0;
-    if (paddle.x + paddle.width > canvas.width) {
-      paddle.x = canvas.width - paddle.width;
-    }
-  }
-
-  function draw() {
-    if (!gameRunning) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawBricks();
-    drawBall();
-    drawPaddle();
-    collisionDetection();
-
-    updatePaddleByTilt();
-
-    if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
-      ball.dx = -ball.dx;
-      beep(400, 0.08); // 牆壁音效
-    }
-
-    if (ball.y + ball.dy < ball.radius) {
-      ball.dy = -ball.dy;
-      beep(400, 0.08);
-    } else if (ball.y + ball.dy > canvas.height - ball.radius) {
-      if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-        ball.dy = -ball.dy;
-        beep(300, 0.1); // 擋板音效
-      } else {
-        gameRunning = false;
-        beep(120, 0.5); // 失敗音效
-        alert("遊戲結束！再玩一次吧 😊");
-        return;
-      }
-    }
-
-    ball.x += ball.dx;
-    ball.y += ball.dy;
-
-    requestAnimationFrame(draw);
-  }
-
-  window.addEventListener("deviceorientation", function (event) {
-    if (event.gamma !== null) {
-      tiltX = event.gamma / 10;
-    }
-  });
-
-  // iOS 感測器 + 音效初始化都需使用者操作
-  startBtn.onclick = function () {
-    initAudio();
-
-    if (typeof DeviceOrientationEvent !== "undefined" &&
-        typeof DeviceOrientationEvent.requestPermission === "function") {
-      DeviceOrientationEvent.requestPermission().then(function (response) {
-        if (response === "granted") startGame();
-        else alert("需要允許感測器才能玩喔！");
-      });
+function selectTile() {
+    if (!firstTile) {
+        firstTile = this;
+        this.classList.add("selected");
     } else {
-      startGame();
+        swapTiles(firstTile, this);
+        firstTile.classList.remove("selected");
+        firstTile = null;
+        checkMatches();
     }
-  };
-};
+}
+
+function swapTiles(tile1, tile2) {
+    const temp = tile1.textContent;
+    tile1.textContent = tile2.textContent;
+    tile2.textContent = temp;
+}
+
+function checkMatches() {
+    let matched = false;
+
+    // 檢查橫排
+    for (let row = 0; row < boardSize; row++) {
+        for (let col = 0; col < boardSize - 2; col++) {
+            let i = row * boardSize + col;
+            if (board[i].textContent &&
+                board[i].textContent === board[i+1].textContent &&
+                board[i].textContent === board[i+2].textContent) {
+
+                board[i].textContent = "";
+                board[i+1].textContent = "";
+                board[i+2].textContent = "";
+                score += 10;
+                matched = true;
+            }
+        }
+    }
+
+    // 檢查直排
+    for (let col = 0; col < boardSize; col++) {
+        for (let row = 0; row < boardSize - 2; row++) {
+            let i = row * boardSize + col;
+            if (board[i].textContent &&
+                board[i].textContent === board[i+boardSize].textContent &&
+                board[i].textContent === board[i+boardSize*2].textContent) {
+
+                board[i].textContent = "";
+                board[i+boardSize].textContent = "";
+                board[i+boardSize*2].textContent = "";
+                score += 10;
+                matched = true;
+            }
+        }
+    }
+
+    if (matched) {
+        playSound();
+        scoreDisplay.textContent = "得分：" + score;
+        setTimeout(dropTiles, 300);
+    }
+}
+
+function dropTiles() {
+    for (let col = 0; col < boardSize; col++) {
+        for (let row = boardSize - 1; row >= 0; row--) {
+            let i = row * boardSize + col;
+            if (board[i].textContent === "") {
+                for (let k = row - 1; k >= 0; k--) {
+                    let above = k * boardSize + col;
+                    if (board[above].textContent !== "") {
+                        board[i].textContent = board[above].textContent;
+                        board[above].textContent = "";
+                        break;
+                    }
+                }
+                if (board[i].textContent === "") {
+                    board[i].textContent = vehicles[Math.floor(Math.random() * vehicles.length)];
+                }
+            }
+        }
+    }
+}
+
+function playSound() {
+    const audio = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+    audio.play();
+}
+
+createBoard();
 </script>
+
 </body>
 </html>
