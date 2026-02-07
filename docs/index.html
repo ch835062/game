@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工程車樂園 3.0</title>
+<title>交通工具樂園 4.0</title>
 
 <style>
 body{
     text-align:center;
-    background:linear-gradient(#87CEEB,#FFF8DC);
+    background:linear-gradient(#d0f0ff,#fff8dc);
     font-family:Arial;
     overflow:hidden;
 }
 
-h1{font-size:30px;}
+h1{font-size:28px;}
 #score,#timer{font-size:22px;margin:5px;}
 
 #game{
@@ -27,9 +27,9 @@ h1{font-size:30px;}
 .tile{
     width:85px;
     height:85px;
-    font-size:48px;
+    font-size:42px;
     background:white;
-    border-radius:20px;
+    border-radius:18px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -52,18 +52,6 @@ h1{font-size:30px;}
     100%{transform:scale(2);opacity:0;}
 }
 
-.rainbow{
-    animation:rainbowBG 1s linear infinite;
-}
-
-@keyframes rainbowBG{
-    0%{background:#ffadad;}
-    25%{background:#ffd6a5;}
-    50%{background:#caffbf;}
-    75%{background:#9bf6ff;}
-    100%{background:#ffadad;}
-}
-
 button{
     font-size:20px;
     padding:10px 20px;
@@ -74,20 +62,18 @@ button{
 
 <body>
 
-<h1>🚜 工程車樂園 🚒</h1>
+<h1>🚦 交通工具樂園 🚦</h1>
 <div id="score">得分：0</div>
 <div id="timer">時間：30</div>
 <button onclick="startGame()">開始遊戲</button>
 <div id="game"></div>
 
 <script>
-const vehicles=["🚜","🚒","🚛","🚧"];
-const names={
-    "🚜":"挖土機來囉！",
-    "🚒":"消防車出動！",
-    "🚛":"大卡車轟隆隆！",
-    "🚧":"工程開始囉！"
-};
+
+const vehicles=[
+"🚂","🚃","🚌","🚎","🚐","🚑","🚒","🚓","🚕","🚗",
+"🚙","🛻","🚚","🚛","🚜","🏎️","🏍️","🛵","🛺","🚲","🛴"
+];
 
 let board=[];
 let selected=[];
@@ -106,7 +92,6 @@ function startGame(){
     timerDisplay.textContent="時間："+timeLeft;
     createBoard();
     startTimer();
-    playBGMusic();
 }
 
 function createBoard(){
@@ -139,11 +124,10 @@ function selectTile(){
 
 function checkMatch(){
     let icons=selected.map(t=>t.textContent);
+
     if(icons[0]===icons[1] && icons[1]===icons[2]){
-        score+=20;
+        score+=30;
         scoreDisplay.textContent="得分："+score;
-        speak(names[icons[0]]);
-        rainbowEffect();
 
         selected.forEach(t=>t.classList.add("explode"));
 
@@ -196,28 +180,11 @@ function startTimer(){
     },1000);
 }
 
-function speak(text){
-    let utter=new SpeechSynthesisUtterance(text);
-    utter.lang="zh-TW";
-    speechSynthesis.speak(utter);
-}
-
-function rainbowEffect(){
-    document.body.classList.add("rainbow");
-    setTimeout(()=>document.body.classList.remove("rainbow"),800);
-}
-
-function playBGMusic(){
-    const bg=new Audio("https://actions.google.com/sounds/v1/ambiences/barnyard.ogg");
-    bg.loop=true;
-    bg.volume=0.2;
-    bg.play();
-}
-
-// 📱 搖晃手機爆炸模式
+// 📱 搖晃手機洗牌
 let lastShake=0;
 window.addEventListener("devicemotion",function(e){
     let acc=e.accelerationIncludingGravity;
+    if(!acc) return;
     let total=Math.abs(acc.x)+Math.abs(acc.y)+Math.abs(acc.z);
     if(total>30){
         if(Date.now()-lastShake>1000){
@@ -225,11 +192,10 @@ window.addEventListener("devicemotion",function(e){
             board.forEach(t=>{
                 t.textContent=randomVehicle();
             });
-            rainbowEffect();
-            speak("全部重來！");
         }
     }
 });
+
 </script>
 
 </body>
