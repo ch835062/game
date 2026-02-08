@@ -1,201 +1,178 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>交通工具樂園 4.0</title>
-
+<meta charset="UTF-8" />
+<title>Fishing MVP</title>
 <style>
-body{
-    text-align:center;
-    background:linear-gradient(#d0f0ff,#fff8dc);
-    font-family:Arial;
-    overflow:hidden;
-}
+  body {
+    background: #222;
+    color: #fff;
+    font-family: monospace;
+    text-align: center;
+  }
 
-h1{font-size:28px;}
-#score,#timer{font-size:22px;margin:5px;}
+  #game {
+    width: 400px;
+    margin: 20px auto;
+    padding: 10px;
+    background: #333;
+    border: 4px solid #555;
+  }
 
-#game{
-    width:360px;
-    margin:auto;
-    display:grid;
-    grid-template-columns:repeat(4,85px);
-    gap:8px;
-}
+  button {
+    font-size: 16px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
 
-.tile{
-    width:85px;
-    height:85px;
-    font-size:42px;
-    background:white;
-    border-radius:18px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor:pointer;
-    transition:0.2s;
-}
+  #bar {
+    position: relative;
+    width: 300px;
+    height: 20px;
+    background: #800;
+    margin: 20px auto;
+  }
 
-.tile.selected{background:#ffeb3b;}
-.tile.hint{animation:glow 1s infinite;}
-.explode{animation:boom 0.4s forwards;}
+  #success {
+    position: absolute;
+    height: 100%;
+    background: #0a0;
+  }
 
-@keyframes glow{
-    0%{box-shadow:0 0 5px orange;}
-    50%{box-shadow:0 0 20px red;}
-    100%{box-shadow:0 0 5px orange;}
-}
-
-@keyframes boom{
-    0%{transform:scale(1);opacity:1;}
-    100%{transform:scale(2);opacity:0;}
-}
-
-button{
-    font-size:20px;
-    padding:10px 20px;
-    margin:10px;
-}
+  #pointer {
+    position: absolute;
+    top: -5px;
+    width: 4px;
+    height: 30px;
+    background: #fff;
+  }
 </style>
 </head>
-
 <body>
 
-<h1>🚦 交通工具樂園 🚦</h1>
-<div id="score">得分：0</div>
-<div id="timer">時間：30</div>
-<button onclick="startGame()">開始遊戲</button>
-<div id="game"></div>
+<h1>🎣 Fishing MVP</h1>
+
+<div id="game">
+  <div id="status">IDLE</div>
+  <div id="money">💰 0</div>
+
+  <button id="castBtn">拋竿</button>
+
+  <div id="bar" style="display:none;">
+    <div id="success"></div>
+    <div id="pointer"></div>
+  </div>
+</div>
 
 <script>
+/* ---------- 狀態 ---------- */
+let gameState = "IDLE"
+let money = 0
+let currentFish = null
 
-const vehicles=[
-"🚂","🚃","🚌","🚎","🚐","🚑","🚒","🚓","🚕","🚗",
-"🚙","🛻","🚚","🚛","🚜","🏎️","🏍️","🛵","🛺","🚲","🛴"
-];
+const fishTable = [
+  { name: "小魚", price: 10, reelTime: 2, successZone: 0.4, speed: 0.6 },
+  { name: "中魚", price: 30, reelTime: 3, successZone: 0.25, speed: 1.0 },
+  { name: "大魚", price: 80, reelTime: 4, successZone: 0.15, speed: 1.4 }
+]
 
-let board=[];
-let selected=[];
-let score=0;
-let timeLeft=30;
-let timerInterval=null;
+/* ---------- DOM ---------- */
+const statusEl = document.getElementById("status")
+const moneyEl = document.getElementById("money")
+const barEl = document.getElementById("bar")
+const successEl = document.getElementById("success")
+const pointerEl = document.getElementById("pointer")
+const castBtn = document.getElementById("castBtn")
 
-const game=document.getElementById("game");
-const scoreDisplay=document.getElementById("score");
-const timerDisplay=document.getElementById("timer");
+/* ---------- 拉線參數 ---------- */
+let pointer = 0.5
+let direction = 1
+let progress = 0
+let danger = 0
+let holding = false
+let lastTime = null
 
-function startGame(){
-    score=0;
-    timeLeft=30;
-    scoreDisplay.textContent="得分："+score;
-    timerDisplay.textContent="時間："+timeLeft;
-    createBoard();
-    startTimer();
+/* ---------- 工具 ---------- */
+function setState(state) {
+  gameState = state
+  statusEl.textContent = state
 }
 
-function createBoard(){
-    game.innerHTML="";
-    board=[];
-    for(let i=0;i<16;i++){
-        let tile=document.createElement("div");
-        tile.classList.add("tile");
-        tile.textContent=randomVehicle();
-        tile.addEventListener("click",selectTile);
-        game.appendChild(tile);
-        board.push(tile);
-    }
-    showHint();
+/* ---------- 拋竿 ---------- */
+castBtn.onclick = () => {
+  if (gameState !== "IDLE") return
+  setState("WAITING")
+
+  setTimeout(() => {
+    setState("REELING")
+    startReel()
+  }, Math.random() * 2000 + 1000)
 }
 
-function randomVehicle(){
-    return vehicles[Math.floor(Math.random()*vehicles.length)];
+/* ---------- 拉線開始 ---------- */
+function startReel() {
+  currentFish = fishTable[Math.floor(Math.random() * fishTable.length)]
+  pointer = 0.5
+  progress = 0
+  danger = 0
+  barEl.style.display = "block"
+
+  successEl.style.left = (0.5 - currentFish.successZone / 2) * 300 + "px"
+  successEl.style.width = currentFish.successZone * 300 + "px"
+
+  lastTime = performance.now()
+  requestAnimationFrame(loop)
 }
 
-function selectTile(){
-    if(selected.includes(this))return;
-    this.classList.add("selected");
-    selected.push(this);
+/* ---------- 主迴圈 ---------- */
+function loop(time) {
+  if (gameState !== "REELING") return
 
-    if(selected.length===3){
-        checkMatch();
-    }
+  const dt = (time - lastTime) / 1000
+  lastTime = time
+
+  pointer += dt * currentFish.speed * (holding ? 1 : -1)
+  pointer = Math.max(0, Math.min(1, pointer))
+
+  const left = 0.5 - currentFish.successZone / 2
+  const right = 0.5 + currentFish.successZone / 2
+
+  if (pointer >= left && pointer <= right) {
+    progress += dt
+    danger = Math.max(0, danger - dt)
+  } else {
+    danger += dt
+  }
+
+  pointerEl.style.left = pointer * 300 + "px"
+
+  if (progress >= currentFish.reelTime) {
+    money += currentFish.price
+    moneyEl.textContent = "💰 " + money
+    endReel("成功釣到 " + currentFish.name)
+    return
+  }
+
+  if (danger >= 1.5) {
+    endReel("魚跑掉了！")
+    return
+  }
+
+  requestAnimationFrame(loop)
 }
 
-function checkMatch(){
-    let icons=selected.map(t=>t.textContent);
-
-    if(icons[0]===icons[1] && icons[1]===icons[2]){
-        score+=30;
-        scoreDisplay.textContent="得分："+score;
-
-        selected.forEach(t=>t.classList.add("explode"));
-
-        setTimeout(()=>{
-            selected.forEach(t=>{
-                t.classList.remove("explode","selected");
-                t.textContent=randomVehicle();
-            });
-            selected=[];
-            showHint();
-        },400);
-
-    }else{
-        setTimeout(()=>{
-            selected.forEach(t=>t.classList.remove("selected"));
-            selected=[];
-        },400);
-    }
+/* ---------- 結束 ---------- */
+function endReel(msg) {
+  alert(msg)
+  barEl.style.display = "none"
+  setState("IDLE")
 }
 
-function showHint(){
-    board.forEach(t=>t.classList.remove("hint"));
-    let counts={};
-    board.forEach(t=>{
-        counts[t.textContent]=(counts[t.textContent]||0)+1;
-    });
-    for(let v in counts){
-        if(counts[v]>=3){
-            let shown=0;
-            board.forEach(t=>{
-                if(t.textContent===v && shown<3){
-                    t.classList.add("hint");
-                    shown++;
-                }
-            });
-            break;
-        }
-    }
-}
-
-function startTimer(){
-    clearInterval(timerInterval);
-    timerInterval=setInterval(()=>{
-        timeLeft--;
-        timerDisplay.textContent="時間："+timeLeft;
-        if(timeLeft<=0){
-            clearInterval(timerInterval);
-            alert("遊戲結束！總得分："+score);
-        }
-    },1000);
-}
-
-// 📱 搖晃手機洗牌
-let lastShake=0;
-window.addEventListener("devicemotion",function(e){
-    let acc=e.accelerationIncludingGravity;
-    if(!acc) return;
-    let total=Math.abs(acc.x)+Math.abs(acc.y)+Math.abs(acc.z);
-    if(total>30){
-        if(Date.now()-lastShake>1000){
-            lastShake=Date.now();
-            board.forEach(t=>{
-                t.textContent=randomVehicle();
-            });
-        }
-    }
-});
-
+/* ---------- 操作 ---------- */
+document.addEventListener("mousedown", () => holding = true)
+document.addEventListener("mouseup", () => holding = false)
+document.addEventListener("touchstart", () => holding = true)
+document.addEventListener("touchend", () => holding = false)
 </script>
 
 </body>
