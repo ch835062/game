@@ -4,80 +4,92 @@
 <meta charset="UTF-8">
 <title>Pixel Fishing Game</title>
 <style>
-  body {
-    background: #222;
-    color: #fff;
-    font-family: monospace;
-    text-align: center;
-  }
+body {
+  background: #222;
+  color: #fff;
+  font-family: monospace;
+  text-align: center;
+}
 
-  #game {
-    width: 320px;
-    height: 180px;
-    margin: 20px auto;
-    background: #5aa9e6;
-    position: relative;
-    border: 4px solid #222;
-    image-rendering: pixelated;
-    transform: scale(2);
-    transform-origin: top center;
-  }
+#game {
+  width: 320px;
+  height: 180px;
+  margin: 20px auto;
+  position: relative;
+  border: 4px solid #222;
+  overflow: hidden;
+  image-rendering: pixelated;
+  transform: scale(2);
+  transform-origin: top center;
+}
 
-  #background {
-    position: absolute;
-    width: 320px;
-    height: 120px;
-    background-image: url('img/water.png');
-    background-repeat: repeat;
-    image-rendering: pixelated;
-    top: 0;
-    left: 0;
-  }
+/* 背景 tile */
+#background {
+  position: absolute;
+  width: 320px;
+  height: 120px;
+  top: 0;
+  left: 0;
+}
 
-  #scene {
-    position: absolute;
-    width: 100%;
-    height: 120px;
-    top: 0;
-    left: 0;
-  }
+/* 場景容器 */
+#scene {
+  position: absolute;
+  width: 100%;
+  height: 120px;
+  top: 0;
+  left: 0;
+}
 
-  #player {
-    position: absolute;
-    bottom: 16px;
-    left: 40px;
-    width: 16px;
-    height: 24px;
-    image-rendering: pixelated;
-  }
+/* 玩家角色 */
+#player {
+  position: absolute;
+  bottom: 16px;
+  left: 40px;
+  width: 16px;
+  height: 24px;
+  background: url('img/sprite.png') no-repeat;
+  image-rendering: pixelated;
+}
 
-  #bar {
-    position: relative;
-    width: 160px;
-    height: 12px;
-    background: #8b0000;
-    border: 2px solid #000;
-    margin: 8px auto;
-    display: none;
-  }
+/* 拉線條 */
+#bar {
+  position: relative;
+  width: 160px;
+  height: 12px;
+  background: #8b0000;
+  border: 2px solid #000;
+  margin: 8px auto;
+  display: none;
+}
 
-  #success {
-    position: absolute;
-    height: 100%;
-    background: #00aa00;
-  }
+#success {
+  position: absolute;
+  height: 100%;
+  background: #00aa00;
+}
 
-  #pointer {
-    position: absolute;
-    top: -2px;
-    width: 2px;
-    height: 16px;
-    background: #fff;
-  }
+#pointer {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 16px;
+  background: #fff;
+}
 
-  #money {
-    margin-top: 4px;
-  }
+/* 魚 */
+.fish {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: url('img/sprite.png') no-repeat;
+  image-rendering: pixelated;
+}
+
+/* UI icon */
+#money {
+  margin-top: 4px;
+}
 </style>
 </head>
 <body>
@@ -87,7 +99,7 @@
 <div id="game">
   <div id="background"></div>
   <div id="scene">
-    <img id="player" src="img/player_idle.png">
+    <div id="player"></div>
   </div>
 
   <div id="money">💰 0</div>
@@ -110,13 +122,24 @@ let pointer = 0.5, direction = 1, progress = 0, danger = 0, holding = false, las
 
 /* ---------- DOM ---------- */
 const playerEl = document.getElementById("player");
-const statusEl = document.getElementById("game"); // 用於 debug
 const moneyEl = document.getElementById("money");
 const barEl = document.getElementById("bar");
 const successEl = document.getElementById("success");
 const pointerEl = document.getElementById("pointer");
 const castBtn = document.getElementById("castBtn");
 const sceneEl = document.getElementById("scene");
+const backgroundEl = document.getElementById("background");
+
+/* ---------- 精靈 sheet 切割資訊 ---------- */
+const sprite = {
+  player: { row:0, width:16, height:24, idle:[0,16], fishing:[32,48] },
+  fish: { row:1, width:16, height:16, map: {
+    "小魚":[0,16], "中魚":[32,48], "大魚":[64,80]
+  }},
+  effect: { row:2, width:32, height:16, map:{hit:0, success:32, fail:64}},
+  ui: { row:3, width:16, height:16, map:{coin:0, rod:16}},
+  bg: { row:4, width:32, height:32, map:{water:0, grass:32, wood:64}}
+};
 
 /* ---------- 魚資料 ---------- */
 const fishTable = [
@@ -125,12 +148,20 @@ const fishTable = [
   { name:"大魚", price:80, reelTime:4, successZone:0.15, speed:1.4 }
 ];
 
+/* ---------- 背景 tile ---------- */
+function drawBackground() {
+  backgroundEl.style.backgroundImage = "url('img/sprite.png')";
+  backgroundEl.style.backgroundRepeat = "repeat";
+  backgroundEl.style.backgroundPosition = `0px -${sprite.bg.row*32}px`;
+  backgroundEl.style.backgroundSize = "auto";
+}
+drawBackground();
+
 /* ---------- 拋竿 ---------- */
 castBtn.onclick = () => {
   if(gameState !== "IDLE") return;
   gameState="WAITING";
-  playerEl.src="img/player_fishing.png";
-
+  setPlayerFrame('fishing',0);
   setTimeout(()=>{
     startReel();
   }, Math.random()*2000+1000);
@@ -143,44 +174,29 @@ function startReel(){
   barEl.style.display="block";
   successEl.style.left=(0.5-currentFish.successZone/2)*160+"px";
   successEl.style.width=currentFish.successZone*160+"px";
-
   lastTime = performance.now();
-  requestAnimationFrame(loop);
-
   spawnFish();
+  requestAnimationFrame(loop);
 }
 
 function loop(time){
-  if(gameState!=="REELING" && gameState!=="WAITING" && gameState!=="HOOK") return;
+  if(gameState!=="REELING" && gameState!=="WAITING") return;
   if(gameState==="WAITING"){ gameState="REELING"; }
   const dt=(time-lastTime)/1000; lastTime=time;
 
   pointer += dt*currentFish.speed*(holding?1:-1);
-  if(pointer<0) pointer=0;
-  if(pointer>1) pointer=1;
+  pointer = Math.max(0,Math.min(1,pointer));
 
   const left = 0.5-currentFish.successZone/2;
   const right = 0.5+currentFish.successZone/2;
-  if(pointer>=left && pointer<=right){
-    progress+=dt;
-    danger=Math.max(0,danger-dt);
-  } else {
-    danger+=dt;
-  }
+  if(pointer>=left && pointer<=right){ progress+=dt; danger=Math.max(0,danger-dt);}
+  else { danger+=dt; }
 
   pointerEl.style.left = pointer*160+"px";
+  animateFish();
 
-  if(progress>=currentFish.reelTime){
-    money += currentFish.price;
-    moneyEl.textContent="💰 "+money;
-    endReel("成功釣到 "+currentFish.name);
-    return;
-  }
-  if(danger>=1.5){
-    endReel("魚跑掉了！");
-    return;
-  }
-
+  if(progress>=currentFish.reelTime){ money+=currentFish.price; moneyEl.textContent="💰 "+money; endReel("成功釣到 "+currentFish.name); return;}
+  if(danger>=1.5){ endReel("魚跑掉了！"); return;}
   requestAnimationFrame(loop);
 }
 
@@ -189,7 +205,7 @@ function endReel(msg){
   alert(msg);
   barEl.style.display="none";
   gameState="IDLE";
-  playerEl.src="img/player_idle.png";
+  setPlayerFrame('idle',0);
   removeFish();
 }
 
@@ -199,19 +215,44 @@ document.addEventListener("mouseup",()=>holding=false);
 document.addEventListener("touchstart",()=>holding=true);
 document.addEventListener("touchend",()=>holding=false);
 
+/* ---------- 玩家精靈控制 ---------- */
+function setPlayerFrame(action,index){
+  const x = sprite.player[action][index];
+  const y = sprite.player.row*24;
+  playerEl.style.backgroundPosition = `-${x}px -${y}px`;
+  playerEl.style.width = sprite.player.width+"px";
+  playerEl.style.height = sprite.player.height+"px";
+}
+
 /* ---------- 魚元素 ---------- */
 let fishEl = null;
+let fishFrameIndex=0;
 function spawnFish(){
-  fishEl = document.createElement("img");
-  fishEl.src = `img/fish_${currentFish.name}.png`;
-  fishEl.style.position="absolute";
-  fishEl.style.width="16px"; fishEl.style.height="16px";
-  fishEl.style.bottom="40px"; fishEl.style.left="150px";
-  fishEl.style.imageRendering="pixelated";
+  fishEl = document.createElement("div");
+  fishEl.className="fish";
   sceneEl.appendChild(fishEl);
+  setFishFrame(0);
+  fishEl.style.bottom="40px";
+  fishEl.style.left="150px";
 }
+
 function removeFish(){
   if(fishEl){ fishEl.remove(); fishEl=null; }
+}
+
+function setFishFrame(frame){
+  const map = sprite.fish.map[currentFish.name];
+  const x = map[frame];
+  const y = sprite.fish.row*16;
+  fishEl.style.backgroundPosition = `-${x}px -${y}px`;
+  fishEl.style.width=sprite.fish.width+"px";
+  fishEl.style.height=sprite.fish.height+"px";
+}
+
+function animateFish(){
+  if(!fishEl) return;
+  fishFrameIndex = (fishFrameIndex+1)%2;
+  setFishFrame(fishFrameIndex);
 }
 </script>
 
