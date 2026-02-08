@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
-<title>Fishing MVP</title>
+<meta charset="UTF-8">
+<title>Pixel Fishing Game</title>
 <style>
   body {
     background: #222;
@@ -12,53 +12,88 @@
   }
 
   #game {
-    width: 400px;
+    width: 320px;
+    height: 180px;
     margin: 20px auto;
-    padding: 10px;
-    background: #333;
-    border: 4px solid #555;
+    background: #5aa9e6;
+    position: relative;
+    border: 4px solid #222;
+    image-rendering: pixelated;
+    transform: scale(2);
+    transform-origin: top center;
   }
 
-  button {
-    font-size: 16px;
-    padding: 8px 16px;
-    cursor: pointer;
+  #background {
+    position: absolute;
+    width: 320px;
+    height: 120px;
+    background-image: url('img/water.png');
+    background-repeat: repeat;
+    image-rendering: pixelated;
+    top: 0;
+    left: 0;
+  }
+
+  #scene {
+    position: absolute;
+    width: 100%;
+    height: 120px;
+    top: 0;
+    left: 0;
+  }
+
+  #player {
+    position: absolute;
+    bottom: 16px;
+    left: 40px;
+    width: 16px;
+    height: 24px;
+    image-rendering: pixelated;
   }
 
   #bar {
     position: relative;
-    width: 300px;
-    height: 20px;
-    background: #800;
-    margin: 20px auto;
+    width: 160px;
+    height: 12px;
+    background: #8b0000;
+    border: 2px solid #000;
+    margin: 8px auto;
+    display: none;
   }
 
   #success {
     position: absolute;
     height: 100%;
-    background: #0a0;
+    background: #00aa00;
   }
 
   #pointer {
     position: absolute;
-    top: -5px;
-    width: 4px;
-    height: 30px;
+    top: -2px;
+    width: 2px;
+    height: 16px;
     background: #fff;
+  }
+
+  #money {
+    margin-top: 4px;
   }
 </style>
 </head>
 <body>
 
-<h1>🎣 Fishing MVP</h1>
+<h1>🎣 Pixel Fishing Game</h1>
 
 <div id="game">
-  <div id="status">IDLE</div>
-  <div id="money">💰 0</div>
+  <div id="background"></div>
+  <div id="scene">
+    <img id="player" src="img/player_idle.png">
+  </div>
 
+  <div id="money">💰 0</div>
   <button id="castBtn">拋竿</button>
 
-  <div id="bar" style="display:none;">
+  <div id="bar">
     <div id="success"></div>
     <div id="pointer"></div>
   </div>
@@ -66,113 +101,118 @@
 
 <script>
 /* ---------- 狀態 ---------- */
-let gameState = "IDLE"
-let money = 0
-let currentFish = null
+let gameState = "IDLE";
+let money = 0;
+let currentFish = null;
 
-const fishTable = [
-  { name: "小魚", price: 10, reelTime: 2, successZone: 0.4, speed: 0.6 },
-  { name: "中魚", price: 30, reelTime: 3, successZone: 0.25, speed: 1.0 },
-  { name: "大魚", price: 80, reelTime: 4, successZone: 0.15, speed: 1.4 }
-]
+/* ---------- 拉線 ---------- */
+let pointer = 0.5, direction = 1, progress = 0, danger = 0, holding = false, lastTime = null;
 
 /* ---------- DOM ---------- */
-const statusEl = document.getElementById("status")
-const moneyEl = document.getElementById("money")
-const barEl = document.getElementById("bar")
-const successEl = document.getElementById("success")
-const pointerEl = document.getElementById("pointer")
-const castBtn = document.getElementById("castBtn")
+const playerEl = document.getElementById("player");
+const statusEl = document.getElementById("game"); // 用於 debug
+const moneyEl = document.getElementById("money");
+const barEl = document.getElementById("bar");
+const successEl = document.getElementById("success");
+const pointerEl = document.getElementById("pointer");
+const castBtn = document.getElementById("castBtn");
+const sceneEl = document.getElementById("scene");
 
-/* ---------- 拉線參數 ---------- */
-let pointer = 0.5
-let direction = 1
-let progress = 0
-let danger = 0
-let holding = false
-let lastTime = null
-
-/* ---------- 工具 ---------- */
-function setState(state) {
-  gameState = state
-  statusEl.textContent = state
-}
+/* ---------- 魚資料 ---------- */
+const fishTable = [
+  { name:"小魚", price:10, reelTime:2, successZone:0.4, speed:0.6 },
+  { name:"中魚", price:30, reelTime:3, successZone:0.25, speed:1.0 },
+  { name:"大魚", price:80, reelTime:4, successZone:0.15, speed:1.4 }
+];
 
 /* ---------- 拋竿 ---------- */
 castBtn.onclick = () => {
-  if (gameState !== "IDLE") return
-  setState("WAITING")
+  if(gameState !== "IDLE") return;
+  gameState="WAITING";
+  playerEl.src="img/player_fishing.png";
 
-  setTimeout(() => {
-    setState("REELING")
-    startReel()
-  }, Math.random() * 2000 + 1000)
+  setTimeout(()=>{
+    startReel();
+  }, Math.random()*2000+1000);
+};
+
+/* ---------- 拉線 ---------- */
+function startReel(){
+  currentFish = fishTable[Math.floor(Math.random()*fishTable.length)];
+  pointer=0.5; progress=0; danger=0;
+  barEl.style.display="block";
+  successEl.style.left=(0.5-currentFish.successZone/2)*160+"px";
+  successEl.style.width=currentFish.successZone*160+"px";
+
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+
+  spawnFish();
 }
 
-/* ---------- 拉線開始 ---------- */
-function startReel() {
-  currentFish = fishTable[Math.floor(Math.random() * fishTable.length)]
-  pointer = 0.5
-  progress = 0
-  danger = 0
-  barEl.style.display = "block"
+function loop(time){
+  if(gameState!=="REELING" && gameState!=="WAITING" && gameState!=="HOOK") return;
+  if(gameState==="WAITING"){ gameState="REELING"; }
+  const dt=(time-lastTime)/1000; lastTime=time;
 
-  successEl.style.left = (0.5 - currentFish.successZone / 2) * 300 + "px"
-  successEl.style.width = currentFish.successZone * 300 + "px"
+  pointer += dt*currentFish.speed*(holding?1:-1);
+  if(pointer<0) pointer=0;
+  if(pointer>1) pointer=1;
 
-  lastTime = performance.now()
-  requestAnimationFrame(loop)
-}
-
-/* ---------- 主迴圈 ---------- */
-function loop(time) {
-  if (gameState !== "REELING") return
-
-  const dt = (time - lastTime) / 1000
-  lastTime = time
-
-  pointer += dt * currentFish.speed * (holding ? 1 : -1)
-  pointer = Math.max(0, Math.min(1, pointer))
-
-  const left = 0.5 - currentFish.successZone / 2
-  const right = 0.5 + currentFish.successZone / 2
-
-  if (pointer >= left && pointer <= right) {
-    progress += dt
-    danger = Math.max(0, danger - dt)
+  const left = 0.5-currentFish.successZone/2;
+  const right = 0.5+currentFish.successZone/2;
+  if(pointer>=left && pointer<=right){
+    progress+=dt;
+    danger=Math.max(0,danger-dt);
   } else {
-    danger += dt
+    danger+=dt;
   }
 
-  pointerEl.style.left = pointer * 300 + "px"
+  pointerEl.style.left = pointer*160+"px";
 
-  if (progress >= currentFish.reelTime) {
-    money += currentFish.price
-    moneyEl.textContent = "💰 " + money
-    endReel("成功釣到 " + currentFish.name)
-    return
+  if(progress>=currentFish.reelTime){
+    money += currentFish.price;
+    moneyEl.textContent="💰 "+money;
+    endReel("成功釣到 "+currentFish.name);
+    return;
+  }
+  if(danger>=1.5){
+    endReel("魚跑掉了！");
+    return;
   }
 
-  if (danger >= 1.5) {
-    endReel("魚跑掉了！")
-    return
-  }
-
-  requestAnimationFrame(loop)
+  requestAnimationFrame(loop);
 }
 
 /* ---------- 結束 ---------- */
-function endReel(msg) {
-  alert(msg)
-  barEl.style.display = "none"
-  setState("IDLE")
+function endReel(msg){
+  alert(msg);
+  barEl.style.display="none";
+  gameState="IDLE";
+  playerEl.src="img/player_idle.png";
+  removeFish();
 }
 
-/* ---------- 操作 ---------- */
-document.addEventListener("mousedown", () => holding = true)
-document.addEventListener("mouseup", () => holding = false)
-document.addEventListener("touchstart", () => holding = true)
-document.addEventListener("touchend", () => holding = false)
+/* ---------- 玩家操作 ---------- */
+document.addEventListener("mousedown",()=>holding=true);
+document.addEventListener("mouseup",()=>holding=false);
+document.addEventListener("touchstart",()=>holding=true);
+document.addEventListener("touchend",()=>holding=false);
+
+/* ---------- 魚元素 ---------- */
+let fishEl = null;
+function spawnFish(){
+  fishEl = document.createElement("img");
+  fishEl.src = `img/fish_${currentFish.name}.png`;
+  fishEl.style.position="absolute";
+  fishEl.style.width="16px"; fishEl.style.height="16px";
+  fishEl.style.bottom="40px"; fishEl.style.left="150px";
+  fishEl.style.imageRendering="pixelated";
+  sceneEl.appendChild(fishEl);
+}
+function removeFish(){
+  if(fishEl){ fishEl.remove(); fishEl=null; }
+}
 </script>
 
 </body>
