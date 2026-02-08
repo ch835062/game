@@ -30,6 +30,7 @@ body {
   height: 120px;
   top: 0;
   left: 0;
+  image-rendering: pixelated;
 }
 
 /* 場景容器 */
@@ -48,7 +49,7 @@ body {
   left: 40px;
   width: 16px;
   height: 24px;
-  background: url('img/sprite.png') no-repeat;
+  background: url('https://raw.githubusercontent.com/ch835062/game/main/docs/img/sprite.png') no-repeat;
   image-rendering: pixelated;
 }
 
@@ -82,7 +83,7 @@ body {
   position: absolute;
   width: 16px;
   height: 16px;
-  background: url('img/sprite.png') no-repeat;
+  background: url('https://raw.githubusercontent.com/ch835062/game/main/docs/img/sprite.png') no-repeat;
   image-rendering: pixelated;
 }
 
@@ -108,153 +109,3 @@ body {
   <div id="bar">
     <div id="success"></div>
     <div id="pointer"></div>
-  </div>
-</div>
-
-<script>
-/* ---------- 狀態 ---------- */
-let gameState = "IDLE";
-let money = 0;
-let currentFish = null;
-
-/* ---------- 拉線 ---------- */
-let pointer = 0.5, direction = 1, progress = 0, danger = 0, holding = false, lastTime = null;
-
-/* ---------- DOM ---------- */
-const playerEl = document.getElementById("player");
-const moneyEl = document.getElementById("money");
-const barEl = document.getElementById("bar");
-const successEl = document.getElementById("success");
-const pointerEl = document.getElementById("pointer");
-const castBtn = document.getElementById("castBtn");
-const sceneEl = document.getElementById("scene");
-const backgroundEl = document.getElementById("background");
-
-/* ---------- 精靈 sheet 切割資訊 ---------- */
-const sprite = {
-  player: { row:0, width:16, height:24, idle:[0,16], fishing:[32,48] },
-  fish: { row:1, width:16, height:16, map: {
-    "小魚":[0,16], "中魚":[32,48], "大魚":[64,80]
-  }},
-  effect: { row:2, width:32, height:16, map:{hit:0, success:32, fail:64}},
-  ui: { row:3, width:16, height:16, map:{coin:0, rod:16}},
-  bg: { row:4, width:32, height:32, map:{water:0, grass:32, wood:64}}
-};
-
-/* ---------- 魚資料 ---------- */
-const fishTable = [
-  { name:"小魚", price:10, reelTime:2, successZone:0.4, speed:0.6 },
-  { name:"中魚", price:30, reelTime:3, successZone:0.25, speed:1.0 },
-  { name:"大魚", price:80, reelTime:4, successZone:0.15, speed:1.4 }
-];
-
-/* ---------- 背景 tile ---------- */
-function drawBackground() {
-  backgroundEl.style.backgroundImage = "url('img/sprite.png')";
-  backgroundEl.style.backgroundRepeat = "repeat";
-  backgroundEl.style.backgroundPosition = `0px -${sprite.bg.row*32}px`;
-  backgroundEl.style.backgroundSize = "auto";
-}
-drawBackground();
-
-/* ---------- 拋竿 ---------- */
-castBtn.onclick = () => {
-  if(gameState !== "IDLE") return;
-  gameState="WAITING";
-  setPlayerFrame('fishing',0);
-  setTimeout(()=>{
-    startReel();
-  }, Math.random()*2000+1000);
-};
-
-/* ---------- 拉線 ---------- */
-function startReel(){
-  currentFish = fishTable[Math.floor(Math.random()*fishTable.length)];
-  pointer=0.5; progress=0; danger=0;
-  barEl.style.display="block";
-  successEl.style.left=(0.5-currentFish.successZone/2)*160+"px";
-  successEl.style.width=currentFish.successZone*160+"px";
-  lastTime = performance.now();
-  spawnFish();
-  requestAnimationFrame(loop);
-}
-
-function loop(time){
-  if(gameState!=="REELING" && gameState!=="WAITING") return;
-  if(gameState==="WAITING"){ gameState="REELING"; }
-  const dt=(time-lastTime)/1000; lastTime=time;
-
-  pointer += dt*currentFish.speed*(holding?1:-1);
-  pointer = Math.max(0,Math.min(1,pointer));
-
-  const left = 0.5-currentFish.successZone/2;
-  const right = 0.5+currentFish.successZone/2;
-  if(pointer>=left && pointer<=right){ progress+=dt; danger=Math.max(0,danger-dt);}
-  else { danger+=dt; }
-
-  pointerEl.style.left = pointer*160+"px";
-  animateFish();
-
-  if(progress>=currentFish.reelTime){ money+=currentFish.price; moneyEl.textContent="💰 "+money; endReel("成功釣到 "+currentFish.name); return;}
-  if(danger>=1.5){ endReel("魚跑掉了！"); return;}
-  requestAnimationFrame(loop);
-}
-
-/* ---------- 結束 ---------- */
-function endReel(msg){
-  alert(msg);
-  barEl.style.display="none";
-  gameState="IDLE";
-  setPlayerFrame('idle',0);
-  removeFish();
-}
-
-/* ---------- 玩家操作 ---------- */
-document.addEventListener("mousedown",()=>holding=true);
-document.addEventListener("mouseup",()=>holding=false);
-document.addEventListener("touchstart",()=>holding=true);
-document.addEventListener("touchend",()=>holding=false);
-
-/* ---------- 玩家精靈控制 ---------- */
-function setPlayerFrame(action,index){
-  const x = sprite.player[action][index];
-  const y = sprite.player.row*24;
-  playerEl.style.backgroundPosition = `-${x}px -${y}px`;
-  playerEl.style.width = sprite.player.width+"px";
-  playerEl.style.height = sprite.player.height+"px";
-}
-
-/* ---------- 魚元素 ---------- */
-let fishEl = null;
-let fishFrameIndex=0;
-function spawnFish(){
-  fishEl = document.createElement("div");
-  fishEl.className="fish";
-  sceneEl.appendChild(fishEl);
-  setFishFrame(0);
-  fishEl.style.bottom="40px";
-  fishEl.style.left="150px";
-}
-
-function removeFish(){
-  if(fishEl){ fishEl.remove(); fishEl=null; }
-}
-
-function setFishFrame(frame){
-  const map = sprite.fish.map[currentFish.name];
-  const x = map[frame];
-  const y = sprite.fish.row*16;
-  fishEl.style.backgroundPosition = `-${x}px -${y}px`;
-  fishEl.style.width=sprite.fish.width+"px";
-  fishEl.style.height=sprite.fish.height+"px";
-}
-
-function animateFish(){
-  if(!fishEl) return;
-  fishFrameIndex = (fishFrameIndex+1)%2;
-  setFishFrame(fishFrameIndex);
-}
-</script>
-
-</body>
-</html>
