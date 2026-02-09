@@ -169,4 +169,22 @@ function checkUFW(){
         alert("✅ 完全正確！");
         document.getElementById("nextBtn").classList.remove("hidden");
     } else {
-        alert("❌ 指令是 sudo
+        alert("❌ 指令是 sudo ufw enable");
+    }
+}
+
+function updateProgress(){
+    let percent = (step / (steps.length - 1)) * 100;
+    document.getElementById("progressBar").style.width = percent + "%";
+}
+
+function restart(){
+    step = 0;
+    loadStep();
+}
+
+loadStep();
+</script>
+
+</body>
+</html>
