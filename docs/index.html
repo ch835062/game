@@ -2,224 +2,139 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>手機版 水下釣魚測試</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FC釣魚太郎 - 戰鬥畫面</title>
 <style>
 body{
   margin:0;
-  overflow:hidden;
-  background:#003366;
+  background:#000;
 }
 canvas{
   display:block;
-  image-rendering: pixelated;
+  margin:auto;
+  image-rendering:pixelated;
+  background:#1e90ff;
 }
 </style>
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<canvas id="game" width="320" height="480"></canvas>
 
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 ctx.imageSmoothingEnabled=false;
 
-function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
-}
-resize();
-window.addEventListener("resize",resize);
-
-/* ===== 狀態 ===== */
-let state="idle";
-let bait={x:0,y:0,vy:0};
-let fishList=[];
-let tension=0;
-let holding=false;
-let hookedFish=null;
+/* ===== 核心數值（依FC邏輯設計） ===== */
+let tension=50;        // 張力初始值
+let distance=100;      // 魚剩餘距離
+let holding=false;     // 是否拉線
+let state="fight";     // 直接進入戰鬥
+let fishPower=1.2;     // 魚強度（中型魚）
 
 /* ===== 音效 ===== */
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-function beep(freq){
+function beep(freq,d=0.1){
   const o=audioCtx.createOscillator();
   const g=audioCtx.createGain();
   o.connect(g); g.connect(audioCtx.destination);
   o.frequency.value=freq;
   o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.15);
-  o.stop(audioCtx.currentTime+0.15);
+  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d);
+  o.stop(audioCtx.currentTime+d);
 }
 
-/* ===== 魚 ===== */
-function spawnFish(){
-  const types=[
-    {size:20,power:0.6,color:"#111"},
-    {size:28,power:1,color:"#222"},
-    {size:36,power:1.6,color:"#000"}
-  ];
-  const t=types[Math.floor(Math.random()*types.length)];
-  fishList.push({
-    x:Math.random()*canvas.width,
-    y:canvas.height*0.3+Math.random()*canvas.height*0.6,
-    vx:(Math.random()<0.5?-1:1)*(1+Math.random()),
-    interest:0,
-    ...t
-  });
-}
-setInterval(spawnFish,1500);
+/* ===== 手機控制 ===== */
+canvas.addEventListener("touchstart",()=>holding=true);
+canvas.addEventListener("touchend",()=>holding=false);
 
-/* ===== 觸控 ===== */
-canvas.addEventListener("touchstart",e=>{
-  e.preventDefault();
-  holding=true;
-
-  if(state==="idle"){
-    bait.x=canvas.width/2;
-    bait.y=0;
-    bait.vy=4;
-    state="dropping";
-    beep(300);
-  }
-  else if(state==="bite"){
-    state="fight";
-    hookedFish=targetFish;
-    beep(800);
-  }
+/* ===== 桌機控制 ===== */
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space") holding=true;
 });
-
-canvas.addEventListener("touchend",()=>{
-  holding=false;
-});
+document.addEventListener("keyup",()=>holding=false);
 
 /* ===== 更新 ===== */
-let targetFish=null;
-let biteTimer=0;
-
 function update(){
 
-  // 背景氣泡
-  if(Math.random()<0.1){
-    bubbles.push({x:Math.random()*canvas.width,y:canvas.height});
+  if(state!=="fight") return;
+
+  if(holding){
+    tension+=1.8*fishPower;
+    distance-=0.6;
+  }else{
+    tension-=1.2;
+    distance+=0.15; // 放太多魚會游遠
   }
 
-  // 魚游動
-  fishList.forEach(f=>{
-    f.x+=f.vx;
-    if(f.x<0||f.x>canvas.width-f.size)f.vx*=-1;
-
-    if(state==="dropping"){
-      let dx=Math.abs(f.x-bait.x);
-      let dy=Math.abs(f.y-bait.y);
-      if(dx<40&&dy<25){
-        f.interest+=0.03;
-        if(f.interest>1){
-          state="bite";
-          targetFish=f;
-          biteTimer=60;
-          beep(1000);
-        }
-      }else{
-        f.interest=Math.max(0,f.interest-0.01);
-      }
-    }
-  });
-
-  if(state==="dropping"){
-    bait.y+=bait.vy;
-    if(bait.y>canvas.height*0.8){
-      bait.vy=0;
-    }
+  // 魚爆衝（FC核心機制）
+  if(Math.random()<0.025){
+    tension+=12*fishPower;
+    beep(120);
   }
 
-  if(state==="bite"){
-    biteTimer--;
-    if(biteTimer<=0) state="dropping";
+  // 張力上下限制
+  tension=Math.max(0,tension);
+
+  // 斷線
+  if(tension>=100){
+    state="lose";
+    beep(80,0.3);
   }
 
-  if(state==="fight" && hookedFish){
-    if(holding){
-      tension+=2*hookedFish.power;
-      bait.y-=2;
-    }else{
-      tension-=1.5;
-    }
+  // 魚逃脫
+  if(distance>=120){
+    state="escape";
+    beep(150,0.3);
+  }
 
-    if(Math.random()<0.03){
-      tension+=8*hookedFish.power;
-    }
-
-    tension=Math.max(0,tension);
-
-    if(tension>100){
-      state="idle";
-      tension=0;
-      hookedFish=null;
-      beep(200);
-    }
-
-    if(bait.y<50){
-      state="idle";
-      tension=0;
-      fishList=fishList.filter(f=>f!==hookedFish);
-      hookedFish=null;
-      beep(600);
-    }
+  // 成功
+  if(distance<=0){
+    state="win";
+    beep(600,0.3);
   }
 }
 
-/* ===== 氣泡 ===== */
-let bubbles=[];
-function updateBubbles(){
-  bubbles.forEach(b=>b.y-=2);
-  bubbles=bubbles.filter(b=>b.y>0);
-}
-
-/* ===== 畫面 ===== */
+/* ===== 繪圖（仿FC簡單風格） ===== */
 function draw(){
 
-  // 水色漸層
-  let grad=ctx.createLinearGradient(0,0,0,canvas.height);
-  grad.addColorStop(0,"#3aa0ff");
-  grad.addColorStop(1,"#001f3f");
-  ctx.fillStyle=grad;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,320,480);
+
+  // 水面
+  ctx.fillStyle="#1e90ff";
+  ctx.fillRect(0,0,320,480);
 
   // 魚
-  fishList.forEach(f=>{
-    ctx.fillStyle=f.color;
-    ctx.fillRect(f.x,f.y,f.size,f.size/3);
-  });
+  ctx.fillStyle="#111";
+  ctx.fillRect(140,240,40,10);
 
-  // 餌
-  if(state!=="idle"){
-    ctx.fillStyle="#ff0";
-    ctx.fillRect(bait.x-3,bait.y,6,6);
-  }
-
-  // 氣泡
-  ctx.fillStyle="rgba(255,255,255,0.5)";
-  bubbles.forEach(b=>{
-    ctx.fillRect(b.x,b.y,4,4);
-  });
-
-  // 張力條
+  // 張力條（右側直立）
   ctx.fillStyle="#000";
-  ctx.fillRect(20,20,120,10);
-  ctx.fillStyle=tension>70?"#f00":"#0f0";
-  ctx.fillRect(20,20,tension,10);
+  ctx.fillRect(290,40,10,400);
+  ctx.fillStyle="#0f0";
+  if(tension>70) ctx.fillStyle="#f00";
+  ctx.fillRect(290,440-tension*4,10,tension*4);
 
-  if(state==="bite"){
-    ctx.fillStyle="#fff";
-    ctx.fillText("！",bait.x,bait.y-10);
+  // 距離顯示
+  ctx.fillStyle="#000";
+  ctx.font="16px monospace";
+  ctx.fillText("DIST:"+Math.floor(distance),20,30);
+
+  if(state==="win"){
+    ctx.fillText("GET!",120,200);
+  }
+  if(state==="lose"){
+    ctx.fillText("LINE BREAK",80,200);
+  }
+  if(state==="escape"){
+    ctx.fillText("ESCAPE",100,200);
   }
 }
 
 /* ===== 主迴圈 ===== */
 function loop(){
   update();
-  updateBubbles();
   draw();
   requestAnimationFrame(loop);
 }
