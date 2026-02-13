@@ -2,45 +2,45 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FC風釣魚太郎</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>手機版 水下釣魚測試</title>
 <style>
 body{
   margin:0;
-  background:#6ec6ff;
-  text-align:center;
-  font-family:monospace;
+  overflow:hidden;
+  background:#003366;
 }
 canvas{
+  display:block;
   image-rendering: pixelated;
-  border:4px solid #000;
-  background:#87CEEB;
-}
-button{
-  margin-top:8px;
-  padding:6px 16px;
 }
 </style>
 </head>
 <body>
 
-<h2>🎣 FC風 釣魚太郎</h2>
-<canvas id="game" width="320" height="480"></canvas>
-<br>
-<button onclick="cast()">拋竿</button>
+<canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+ctx.imageSmoothingEnabled=false;
 
+function resize(){
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 狀態 ===== */
 let state="idle";
-let hookY=0;
+let bait={x:0,y:0,vy:0};
+let fishList=[];
 let tension=0;
 let holding=false;
 let hookedFish=null;
-let score=0;
 
+/* ===== 音效 ===== */
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 function beep(freq){
   const o=audioCtx.createOscillator();
@@ -52,64 +52,68 @@ function beep(freq){
   o.stop(audioCtx.currentTime+0.15);
 }
 
-/* ===== 魚 AI ===== */
-let fishList=[];
+/* ===== 魚 ===== */
 function spawnFish(){
   const types=[
-    {size:16,power:0.5,color:"#333"},
-    {size:20,power:1,color:"#222"},
-    {size:26,power:1.5,color:"#111"}
+    {size:20,power:0.6,color:"#111"},
+    {size:28,power:1,color:"#222"},
+    {size:36,power:1.6,color:"#000"}
   ];
   const t=types[Math.floor(Math.random()*types.length)];
   fishList.push({
-    x:Math.random()*280,
-    y:260+Math.random()*150,
-    vx:(Math.random()<0.5?-1:1)*1.2,
+    x:Math.random()*canvas.width,
+    y:canvas.height*0.3+Math.random()*canvas.height*0.6,
+    vx:(Math.random()<0.5?-1:1)*(1+Math.random()),
     interest:0,
     ...t
   });
 }
-setInterval(spawnFish,2000);
+setInterval(spawnFish,1500);
 
-/* ===== 控制 ===== */
-document.addEventListener("keydown",e=>{
-  if(e.code==="Space"){
-    if(state==="bite"){
-      state="fight";
-      hookedFish=targetFish;
-      beep(800);
-    }
-    holding=true;
+/* ===== 觸控 ===== */
+canvas.addEventListener("touchstart",e=>{
+  e.preventDefault();
+  holding=true;
+
+  if(state==="idle"){
+    bait.x=canvas.width/2;
+    bait.y=0;
+    bait.vy=4;
+    state="dropping";
+    beep(300);
+  }
+  else if(state==="bite"){
+    state="fight";
+    hookedFish=targetFish;
+    beep(800);
   }
 });
-document.addEventListener("keyup",()=>holding=false);
-canvas.addEventListener("mousedown",()=>holding=true);
-canvas.addEventListener("mouseup",()=>holding=false);
 
-function cast(){
-  if(state!=="idle")return;
-  state="waiting";
-  hookY=220;
-  beep(300);
-}
+canvas.addEventListener("touchend",()=>{
+  holding=false;
+});
 
 /* ===== 更新 ===== */
-let biteTimer=0;
 let targetFish=null;
+let biteTimer=0;
 
 function update(){
 
-  // 魚巡航
+  // 背景氣泡
+  if(Math.random()<0.1){
+    bubbles.push({x:Math.random()*canvas.width,y:canvas.height});
+  }
+
+  // 魚游動
   fishList.forEach(f=>{
     f.x+=f.vx;
-    if(f.x<0||f.x>320-f.size)f.vx*=-1;
+    if(f.x<0||f.x>canvas.width-f.size)f.vx*=-1;
 
-    // 接近餌增加興趣
-    if(state==="waiting"){
-      let dx=Math.abs(f.x-150);
-      let dy=Math.abs(f.y-hookY);
-      if(dx<30&&dy<20){
-        f.interest+=0.02;
+    if(state==="dropping"){
+      let dx=Math.abs(f.x-bait.x);
+      let dy=Math.abs(f.y-bait.y);
+      if(dx<40&&dy<25){
+        f.interest+=0.03;
         if(f.interest>1){
           state="bite";
           targetFish=f;
@@ -122,26 +126,28 @@ function update(){
     }
   });
 
-  // 咬鉤反應時間
-  if(state==="bite"){
-    biteTimer--;
-    if(biteTimer<=0){
-      state="waiting";
+  if(state==="dropping"){
+    bait.y+=bait.vy;
+    if(bait.y>canvas.height*0.8){
+      bait.vy=0;
     }
   }
 
-  // 拉鋸戰
+  if(state==="bite"){
+    biteTimer--;
+    if(biteTimer<=0) state="dropping";
+  }
+
   if(state==="fight" && hookedFish){
     if(holding){
       tension+=2*hookedFish.power;
-      hookY-=1;
+      bait.y-=2;
     }else{
       tension-=1.5;
     }
 
-    // 魚爆衝
-    if(Math.random()<0.02){
-      tension+=10*hookedFish.power;
+    if(Math.random()<0.03){
+      tension+=8*hookedFish.power;
     }
 
     tension=Math.max(0,tension);
@@ -153,40 +159,50 @@ function update(){
       beep(200);
     }
 
-    if(hookY<=220){
-      score+=Math.floor(50*hookedFish.power);
-      fishList=fishList.filter(f=>f!==hookedFish);
+    if(bait.y<50){
       state="idle";
       tension=0;
+      fishList=fishList.filter(f=>f!==hookedFish);
       hookedFish=null;
       beep(600);
     }
   }
 }
 
-/* ===== 繪圖 ===== */
+/* ===== 氣泡 ===== */
+let bubbles=[];
+function updateBubbles(){
+  bubbles.forEach(b=>b.y-=2);
+  bubbles=bubbles.filter(b=>b.y>0);
+}
+
+/* ===== 畫面 ===== */
 function draw(){
-  ctx.clearRect(0,0,320,480);
 
-  // 岸邊
-  ctx.fillStyle="#228B22";
-  ctx.fillRect(0,200,320,40);
+  // 水色漸層
+  let grad=ctx.createLinearGradient(0,0,0,canvas.height);
+  grad.addColorStop(0,"#3aa0ff");
+  grad.addColorStop(1,"#001f3f");
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // 水
-  ctx.fillStyle="#1e90ff";
-  ctx.fillRect(0,240,320,240);
-
-  // 魚影
+  // 魚
   fishList.forEach(f=>{
     ctx.fillStyle=f.color;
     ctx.fillRect(f.x,f.y,f.size,f.size/3);
   });
 
-  // 釣線
+  // 餌
   if(state!=="idle"){
-    ctx.fillStyle="#fff";
-    ctx.fillRect(150,200,2,hookY-200);
+    ctx.fillStyle="#ff0";
+    ctx.fillRect(bait.x-3,bait.y,6,6);
   }
+
+  // 氣泡
+  ctx.fillStyle="rgba(255,255,255,0.5)";
+  bubbles.forEach(b=>{
+    ctx.fillRect(b.x,b.y,4,4);
+  });
 
   // 張力條
   ctx.fillStyle="#000";
@@ -194,17 +210,16 @@ function draw(){
   ctx.fillStyle=tension>70?"#f00":"#0f0";
   ctx.fillRect(20,20,tension,10);
 
-  ctx.fillStyle="#000";
-  ctx.fillText("金幣:"+score,200,30);
-
   if(state==="bite"){
-    ctx.fillStyle="#ff0";
-    ctx.fillText("！",150,180);
+    ctx.fillStyle="#fff";
+    ctx.fillText("！",bait.x,bait.y-10);
   }
 }
 
+/* ===== 主迴圈 ===== */
 function loop(){
   update();
+  updateBubbles();
   draw();
   requestAnimationFrame(loop);
 }
