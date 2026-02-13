@@ -3,50 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>像素釣魚遊戲</title>
+<title>像素釣魚 - 游動魚版</title>
 <style>
-body {
+body{
+  margin:0;
   background:#87CEEB;
   text-align:center;
-  margin:0;
   font-family:monospace;
 }
 canvas{
   image-rendering: pixelated;
   border:4px solid #000;
   background:#4ec0ff;
-  margin-top:10px;
 }
 button{
-  padding:10px 20px;
-  font-size:16px;
   margin-top:10px;
+  padding:8px 16px;
+  font-size:16px;
 }
 </style>
 </head>
 <body>
 
-<h2>🎣 像素釣魚太郎</h2>
+<h2>🎣 像素釣魚（魚會游動）</h2>
 <canvas id="game" width="320" height="480"></canvas>
 <br>
 <button onclick="cast()">拋竿</button>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+ctx.imageSmoothingEnabled=false;
 
-ctx.imageSmoothingEnabled = false;
+let state="idle";
+let hookY=0;
+let fishList=[];
+let hookedFish=null;
+let score=0;
 
-let state = "idle";
-let fishTimer = 0;
-let power = 0;
-let score = 0;
-let fishName = "";
-
-const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+/* ===== 音效 ===== */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 function beep(freq){
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
   o.connect(g); g.connect(audioCtx.destination);
   o.frequency.value=freq;
   o.start();
@@ -54,59 +53,95 @@ function beep(freq){
   o.stop(audioCtx.currentTime+0.2);
 }
 
+/* ===== 產生魚 ===== */
+function spawnFish(){
+  const types=[
+    {color:"#ff4444",size:16,score:10},
+    {color:"#ffaa00",size:20,score:20},
+    {color:"#00ffcc",size:24,score:50}
+  ];
+  const t=types[Math.floor(Math.random()*types.length)];
+  fishList.push({
+    x:Math.random()*300,
+    y:220+Math.random()*200,
+    vx:(Math.random()<0.5?-1:1)*(1+Math.random()*1.5),
+    ...t
+  });
+}
+setInterval(spawnFish,1500);
+
+/* ===== 拋竿 ===== */
 function cast(){
   if(state!=="idle")return;
-  state="waiting";
-  fishTimer = Math.random()*200+100;
+  state="dropping";
+  hookY=0;
   beep(300);
 }
 
-document.addEventListener("keydown",e=>{
-  if(e.code==="Space" && state==="bite"){
-    state="reeling";
-  }
-});
-
 canvas.addEventListener("click",()=>{
-  if(state==="bite"){
+  if(state==="hooked"){
+    state="reeling";
+    beep(700);
+  }
+});
+
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"&&state==="hooked"){
     state="reeling";
   }
 });
 
+/* ===== 更新 ===== */
 function update(){
-  if(state==="waiting"){
-    fishTimer--;
-    if(fishTimer<=0){
-      state="bite";
-      beep(800);
+
+  // 魚游動
+  fishList.forEach(f=>{
+    f.x+=f.vx;
+    if(f.x<0||f.x>320-f.size){
+      f.vx*=-1;
     }
+  });
+
+  if(state==="dropping"){
+    hookY+=4;
+    if(hookY>400) state="idle";
+    fishList.forEach(f=>{
+      if(
+        hookY>f.y &&
+        hookY<f.y+f.size &&
+        150>f.x &&
+        155<f.x+f.size
+      ){
+        hookedFish=f;
+        state="hooked";
+        beep(900);
+      }
+    });
   }
 
   if(state==="reeling"){
-    power+=2;
-    if(power>=100){
-      catchFish();
+    hookY-=4;
+    if(hookedFish){
+      hookedFish.y=hookY;
+      hookedFish.x=150;
+    }
+    if(hookY<=0){
+      score+=hookedFish.score;
+      fishList=fishList.filter(f=>f!==hookedFish);
+      hookedFish=null;
+      state="idle";
     }
   }
 }
 
-function catchFish(){
-  const fishes=[
-    {name:"小魚",score:10},
-    {name:"大魚",score:30},
-    {name:"稀有魚",score:100}
-  ];
-  const f = fishes[Math.floor(Math.random()*fishes.length)];
-  score+=f.score;
-  fishName=f.name;
-  beep(600);
-  state="result";
-  setTimeout(()=>{
-    state="idle";
-    power=0;
-  },1500);
+/* ===== 畫像素魚 ===== */
+function drawFish(f){
+  ctx.fillStyle=f.color;
+  ctx.fillRect(f.x,f.y,f.size,f.size/2);
+  ctx.fillRect(f.x-4,f.y+4,4,4);
 }
 
+/* ===== 畫面 ===== */
 function draw(){
   ctx.clearRect(0,0,320,480);
 
@@ -116,36 +151,28 @@ function draw(){
 
   // 釣竿
   ctx.fillStyle="#8B4513";
-  ctx.fillRect(150,0,5,200);
+  ctx.fillRect(150,0,4,200);
 
   // 線
   if(state!=="idle"){
     ctx.fillStyle="#fff";
-    ctx.fillRect(152,200,2,100);
+    ctx.fillRect(152,200,2,hookY);
   }
 
-  // 力量條
-  if(state==="reeling"){
-    ctx.fillStyle="#000";
-    ctx.fillRect(60,420,200,20);
-    ctx.fillStyle="#0f0";
-    ctx.fillRect(60,420,power*2,20);
-  }
+  // 魚
+  fishList.forEach(drawFish);
 
+  // 分數
   ctx.fillStyle="#000";
   ctx.fillText("金幣:"+score,10,20);
 
-  if(state==="bite"){
+  if(state==="hooked"){
     ctx.fillStyle="#ff0";
-    ctx.fillText("魚上鉤！快點擊！",90,180);
-  }
-
-  if(state==="result"){
-    ctx.fillStyle="#fff";
-    ctx.fillText("釣到:"+fishName,110,160);
+    ctx.fillText("魚上鉤！點擊收線！",70,180);
   }
 }
 
+/* ===== 主迴圈 ===== */
 function loop(){
   update();
   draw();
