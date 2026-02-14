@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FC風水下畫面</title>
+<title>FC 釣魚太郎 水下畫面</title>
 <style>
 body{
   margin:0;
@@ -17,9 +17,9 @@ body{
   position:relative;
 }
 canvas{
-  image-rendering:pixelated;
   width:512px;
   height:480px;
+  image-rendering:pixelated;
 }
 .scanlines{
   pointer-events:none;
@@ -48,68 +48,68 @@ canvas{
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;
+ctx.imageSmoothingEnabled=false;
 
-let bubbles = [];
-let frame = 0;
+let frame=0;
 
-/* 初始化氣泡 */
-for(let i=0;i<20;i++){
+/* ================= 背景 ================= */
+
+let bubbles=[];
+for(let i=0;i<25;i++){
   bubbles.push({
     x:Math.random()*256,
     y:Math.random()*240,
-    speed:0.3+Math.random()*0.5
+    speed:0.2+Math.random()*0.4
   });
 }
 
 function drawBackground(){
 
-  /* 深藍漸層 */
-  const grad = ctx.createLinearGradient(0,0,0,240);
-  grad.addColorStop(0,"#4fa6ff");
-  grad.addColorStop(0.4,"#2f5bff");
-  grad.addColorStop(1,"#1a1fa8");
-  ctx.fillStyle=grad;
+  // 深藍漸層
+  const g=ctx.createLinearGradient(0,0,0,240);
+  g.addColorStop(0,"#4fa6ff");
+  g.addColorStop(0.4,"#2f5bff");
+  g.addColorStop(1,"#1a1fa8");
+  ctx.fillStyle=g;
   ctx.fillRect(0,0,256,240);
 
-  /* 水面波紋 */
+  // 水面波紋
   ctx.fillStyle="#ffffff";
   for(let i=0;i<256;i+=8){
     ctx.fillRect(i,35+Math.sin((i+frame)*0.05)*2,6,3);
   }
 
-  /* 山 */
+  // 山
   ctx.fillStyle="#7fcf3f";
   ctx.beginPath();
   ctx.moveTo(0,30);
-  ctx.lineTo(40,15);
-  ctx.lineTo(90,28);
-  ctx.lineTo(150,12);
-  ctx.lineTo(200,30);
+  ctx.lineTo(50,15);
+  ctx.lineTo(100,28);
+  ctx.lineTo(160,12);
+  ctx.lineTo(210,28);
   ctx.lineTo(256,18);
   ctx.lineTo(256,0);
   ctx.lineTo(0,0);
-  ctx.closePath();
   ctx.fill();
 
-  /* 樹林 */
+  // 樹
   ctx.fillStyle="#2f8f1f";
   for(let i=0;i<256;i+=6){
     ctx.fillRect(i,25,4,10);
   }
 
-  /* 河床 */
+  // 河床石頭
   ctx.fillStyle="#8ca0c8";
-  for(let i=0;i<256;i+=16){
-    for(let j=200;j<240;j+=16){
+  for(let x=0;x<256;x+=16){
+    for(let y=200;y<240;y+=16){
       ctx.beginPath();
-      ctx.arc(i+8,j+8,7,0,Math.PI*2);
+      ctx.arc(x+8,y+8,7,0,Math.PI*2);
       ctx.fill();
     }
   }
 
-  /* 漂流木 */
-  ctx.strokeStyle="#4a4a4a";
+  // 漂流木
+  ctx.strokeStyle="#444";
   ctx.lineWidth=3;
   ctx.beginPath();
   ctx.moveTo(20,220);
@@ -117,7 +117,7 @@ function drawBackground(){
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(200,215);
+  ctx.moveTo(190,215);
   ctx.lineTo(230,200);
   ctx.stroke();
 }
@@ -127,7 +127,7 @@ function drawFishingLine(){
   ctx.lineWidth=1;
   ctx.beginPath();
   ctx.moveTo(128,0);
-  ctx.lineTo(128,150);
+  ctx.lineTo(128,160);
   ctx.stroke();
 }
 
@@ -145,16 +145,103 @@ function drawBubbles(){
   });
 }
 
+/* ================= 魚 ================= */
+
+class Fish{
+  constructor(x,y,color,dir=1){
+    this.x=x;
+    this.y=y;
+    this.dir=dir;
+    this.frame=0;
+    this.speed=0.3+Math.random()*0.4;
+    this.color=color;
+  }
+
+  update(){
+    this.x+=this.speed*this.dir;
+    if(this.x>280) this.dir=-1;
+    if(this.x<-40) this.dir=1;
+
+    if(frame%20===0){
+      this.frame=(this.frame+1)%2;
+    }
+  }
+
+  draw(){
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    ctx.scale(this.dir,1);
+
+    drawFishSprite(this.frame,this.color);
+
+    ctx.restore();
+  }
+}
+
+function drawFishSprite(f,color){
+
+  let body=color==="blue"?"#9fc5ff":"#cfd6dd";
+  let shadow=color==="blue"?"#6a9ed6":"#9ea6b3";
+
+  // 身體
+  ctx.fillStyle=body;
+  ctx.fillRect(-16,-6,28,12);
+
+  // 陰影
+  ctx.fillStyle=shadow;
+  ctx.fillRect(-16,0,28,6);
+
+  // 黑描邊
+  ctx.strokeStyle="#000";
+  ctx.strokeRect(-16,-6,28,12);
+
+  // 頭
+  ctx.fillStyle=body;
+  ctx.fillRect(10,-5,8,10);
+  ctx.strokeRect(10,-5,8,10);
+
+  // 眼睛
+  ctx.fillStyle="#000";
+  ctx.fillRect(14,-2,2,2);
+
+  // 魚鰭
+  ctx.fillStyle=shadow;
+  ctx.fillRect(-4,-10,6,6);
+
+  // 尾巴動畫
+  ctx.fillStyle=body;
+  if(f===0){
+    ctx.fillRect(-22,-6,6,12);
+  }else{
+    ctx.fillRect(-22,-4,6,8);
+  }
+  ctx.strokeRect(-22,-6,6,12);
+}
+
+let fishes=[
+  new Fish(80,120,"silver",1),
+  new Fish(200,150,"blue",-1)
+];
+
+/* ================= 主迴圈 ================= */
+
 function loop(){
   ctx.clearRect(0,0,256,240);
   drawBackground();
   drawFishingLine();
   drawBubbles();
+
+  fishes.forEach(f=>{
+    f.update();
+    f.draw();
+  });
+
   frame++;
   requestAnimationFrame(loop);
 }
 
 loop();
 </script>
+
 </body>
 </html>
