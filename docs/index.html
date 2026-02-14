@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FC釣魚戰鬥畫面 - 點陣魚版</title>
+<title>FC風水下畫面</title>
 <style>
 body{
   margin:0;
@@ -18,9 +18,8 @@ body{
 }
 canvas{
   image-rendering:pixelated;
-  width:512px;   /* 放大2倍 */
+  width:512px;
   height:480px;
-  background:#1e90ff;
 }
 .scanlines{
   pointer-events:none;
@@ -42,8 +41,8 @@ canvas{
 <body>
 
 <div id="wrapper">
-  <canvas id="game" width="256" height="240"></canvas>
-  <div class="scanlines"></div>
+<canvas id="game" width="256" height="240"></canvas>
+<div class="scanlines"></div>
 </div>
 
 <script>
@@ -51,88 +50,111 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 
+let bubbles = [];
 let frame = 0;
 
-/* ===== FC風像素魚 (16x8) ===== */
-const fishFrame1 = [
-"0000111111110000",
-"0001112222211100",
-"0011222222222110",
-"0122222222222211",
-"0122222222222211",
-"0011222222222110",
-"0001112222211100",
-"0000111111110000"
-];
+/* 初始化氣泡 */
+for(let i=0;i<20;i++){
+  bubbles.push({
+    x:Math.random()*256,
+    y:Math.random()*240,
+    speed:0.3+Math.random()*0.5
+  });
+}
 
-const fishFrame2 = [
-"0000111111110000",
-"0001112222211000",
-"0011222222221000",
-"0122222222221100",
-"0122222222221100",
-"0011222222221000",
-"0001112222211000",
-"0000111111110000"
-];
+function drawBackground(){
 
-/* NES風限制色 */
-const palette = {
-  "0": null,
-  "1": "#0c0c0c",   // 深色輪廓
-  "2": "#2f2f2f"    // 魚身
-};
+  /* 深藍漸層 */
+  const grad = ctx.createLinearGradient(0,0,0,240);
+  grad.addColorStop(0,"#4fa6ff");
+  grad.addColorStop(0.4,"#2f5bff");
+  grad.addColorStop(1,"#1a1fa8");
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,256,240);
 
-function drawFish(x,y){
-  const sprite = (frame%30<15)?fishFrame1:fishFrame2;
+  /* 水面波紋 */
+  ctx.fillStyle="#ffffff";
+  for(let i=0;i<256;i+=8){
+    ctx.fillRect(i,35+Math.sin((i+frame)*0.05)*2,6,3);
+  }
 
-  for(let row=0; row<sprite.length; row++){
-    for(let col=0; col<sprite[row].length; col++){
-      const pixel = sprite[row][col];
-      if(palette[pixel]){
-        ctx.fillStyle = palette[pixel];
-        ctx.fillRect(x+col, y+row, 1, 1);
-      }
+  /* 山 */
+  ctx.fillStyle="#7fcf3f";
+  ctx.beginPath();
+  ctx.moveTo(0,30);
+  ctx.lineTo(40,15);
+  ctx.lineTo(90,28);
+  ctx.lineTo(150,12);
+  ctx.lineTo(200,30);
+  ctx.lineTo(256,18);
+  ctx.lineTo(256,0);
+  ctx.lineTo(0,0);
+  ctx.closePath();
+  ctx.fill();
+
+  /* 樹林 */
+  ctx.fillStyle="#2f8f1f";
+  for(let i=0;i<256;i+=6){
+    ctx.fillRect(i,25,4,10);
+  }
+
+  /* 河床 */
+  ctx.fillStyle="#8ca0c8";
+  for(let i=0;i<256;i+=16){
+    for(let j=200;j<240;j+=16){
+      ctx.beginPath();
+      ctx.arc(i+8,j+8,7,0,Math.PI*2);
+      ctx.fill();
     }
   }
+
+  /* 漂流木 */
+  ctx.strokeStyle="#4a4a4a";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(20,220);
+  ctx.lineTo(60,205);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(200,215);
+  ctx.lineTo(230,200);
+  ctx.stroke();
 }
 
-function draw(){
+function drawFishingLine(){
+  ctx.strokeStyle="#000";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(128,0);
+  ctx.lineTo(128,150);
+  ctx.stroke();
+}
 
+function drawBubbles(){
+  ctx.fillStyle="#9fd4ff";
+  bubbles.forEach(b=>{
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,2,0,Math.PI*2);
+    ctx.fill();
+    b.y-=b.speed;
+    if(b.y<40){
+      b.y=240;
+      b.x=Math.random()*256;
+    }
+  });
+}
+
+function loop(){
   ctx.clearRect(0,0,256,240);
-
-  /* 水面條紋 */
-  for(let i=0;i<240;i+=8){
-    ctx.fillStyle = i%16===0 ? "#1e90ff" : "#1878d6";
-    ctx.fillRect(0,i,256,8);
-  }
-
-  /* 魚 */
-  drawFish(100,110);
-
-  /* 張力條 */
-  ctx.fillStyle="#000";
-  ctx.fillRect(230,20,8,200);
-  ctx.fillStyle="#00ff00";
-  ctx.fillRect(230,120,8,100);
-
-  /* 距離 */
-  ctx.fillStyle="#000";
-  ctx.font="12px monospace";
-  ctx.fillText("DIST 085",10,20);
-
-  /* 閃爍 ! */
-  if(frame%40<20){
-    ctx.fillStyle="#ffff00";
-    ctx.fillText("!",120,90);
-  }
-
+  drawBackground();
+  drawFishingLine();
+  drawBubbles();
   frame++;
-  requestAnimationFrame(draw);
+  requestAnimationFrame(loop);
 }
 
-draw();
+loop();
 </script>
-
 </body>
 </html>
