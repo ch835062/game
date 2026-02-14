@@ -3,142 +3,101 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FC釣魚太郎 - 戰鬥畫面</title>
+<title>FC釣魚戰鬥畫面 - 純視覺版</title>
 <style>
 body{
   margin:0;
   background:#000;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
 }
+
+#wrapper{
+  position:relative;
+}
+
 canvas{
-  display:block;
-  margin:auto;
   image-rendering:pixelated;
+  width:384px;   /* 256x240 放大1.5倍 */
+  height:360px;
   background:#1e90ff;
+}
+
+/* CRT掃描線 */
+.scanlines{
+  pointer-events:none;
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.2) 0px,
+    rgba(0,0,0,0.2) 1px,
+    transparent 2px,
+    transparent 3px
+  );
 }
 </style>
 </head>
 <body>
 
-<canvas id="game" width="320" height="480"></canvas>
+<div id="wrapper">
+  <canvas id="game" width="256" height="240"></canvas>
+  <div class="scanlines"></div>
+</div>
 
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-ctx.imageSmoothingEnabled=false;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
 
-/* ===== 核心數值（依FC邏輯設計） ===== */
-let tension=50;        // 張力初始值
-let distance=100;      // 魚剩餘距離
-let holding=false;     // 是否拉線
-let state="fight";     // 直接進入戰鬥
-let fishPower=1.2;     // 魚強度（中型魚）
+let frame = 0;
 
-/* ===== 音效 ===== */
-const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-function beep(freq,d=0.1){
-  const o=audioCtx.createOscillator();
-  const g=audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination);
-  o.frequency.value=freq;
-  o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d);
-  o.stop(audioCtx.currentTime+d);
-}
-
-/* ===== 手機控制 ===== */
-canvas.addEventListener("touchstart",()=>holding=true);
-canvas.addEventListener("touchend",()=>holding=false);
-
-/* ===== 桌機控制 ===== */
-document.addEventListener("keydown",e=>{
-  if(e.code==="Space") holding=true;
-});
-document.addEventListener("keyup",()=>holding=false);
-
-/* ===== 更新 ===== */
-function update(){
-
-  if(state!=="fight") return;
-
-  if(holding){
-    tension+=1.8*fishPower;
-    distance-=0.6;
-  }else{
-    tension-=1.2;
-    distance+=0.15; // 放太多魚會游遠
-  }
-
-  // 魚爆衝（FC核心機制）
-  if(Math.random()<0.025){
-    tension+=12*fishPower;
-    beep(120);
-  }
-
-  // 張力上下限制
-  tension=Math.max(0,tension);
-
-  // 斷線
-  if(tension>=100){
-    state="lose";
-    beep(80,0.3);
-  }
-
-  // 魚逃脫
-  if(distance>=120){
-    state="escape";
-    beep(150,0.3);
-  }
-
-  // 成功
-  if(distance<=0){
-    state="win";
-    beep(600,0.3);
-  }
-}
-
-/* ===== 繪圖（仿FC簡單風格） ===== */
 function draw(){
 
-  ctx.clearRect(0,0,320,480);
+  ctx.clearRect(0,0,256,240);
 
-  // 水面
-  ctx.fillStyle="#1e90ff";
-  ctx.fillRect(0,0,320,480);
+  /* ===== 水面背景（NES風水平條紋） ===== */
+  for(let i=0;i<240;i+=8){
+    ctx.fillStyle = i%16===0 ? "#1e90ff" : "#1878d6";
+    ctx.fillRect(0,i,256,8);
+  }
 
-  // 魚
+  /* ===== 魚（簡單擺尾動畫） ===== */
+  let tailOffset = (frame%20<10)?0:2;
+
   ctx.fillStyle="#111";
-  ctx.fillRect(140,240,40,10);
+  ctx.fillRect(100,120,40,8);   // 魚身
+  ctx.fillRect(95+tailOffset,122,5,4);  // 魚尾
+  ctx.fillRect(135,122,4,4);    // 魚頭
 
-  // 張力條（右側直立）
+  /* ===== 右側張力條（示意值60%） ===== */
   ctx.fillStyle="#000";
-  ctx.fillRect(290,40,10,400);
-  ctx.fillStyle="#0f0";
-  if(tension>70) ctx.fillStyle="#f00";
-  ctx.fillRect(290,440-tension*4,10,tension*4);
+  ctx.fillRect(230,20,8,200);
 
-  // 距離顯示
+  ctx.fillStyle="#00ff00";
+  ctx.fillRect(230,140,8,80);
+
+  /* ===== 距離數字 ===== */
   ctx.fillStyle="#000";
-  ctx.font="16px monospace";
-  ctx.fillText("DIST:"+Math.floor(distance),20,30);
+  ctx.font="12px monospace";
+  ctx.fillText("DIST 085",10,20);
 
-  if(state==="win"){
-    ctx.fillText("GET!",120,200);
+  /* ===== 閃爍驚嘆號 ===== */
+  if(frame%40<20){
+    ctx.fillStyle="#ffff00";
+    ctx.fillText("!",125,100);
   }
-  if(state==="lose"){
-    ctx.fillText("LINE BREAK",80,200);
-  }
-  if(state==="escape"){
-    ctx.fillText("ESCAPE",100,200);
-  }
+
+  frame++;
+  requestAnimationFrame(draw);
 }
 
-/* ===== 主迴圈 ===== */
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-loop();
+draw();
 </script>
 
 </body>
