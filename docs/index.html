@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FC釣魚戰鬥畫面 - 純視覺版</title>
+<title>FC釣魚戰鬥畫面 - 點陣魚版</title>
 <style>
 body{
   margin:0;
@@ -13,19 +13,15 @@ body{
   align-items:center;
   height:100vh;
 }
-
 #wrapper{
   position:relative;
 }
-
 canvas{
   image-rendering:pixelated;
-  width:384px;   /* 256x240 放大1.5倍 */
-  height:360px;
+  width:512px;   /* 放大2倍 */
+  height:480px;
   background:#1e90ff;
 }
-
-/* CRT掃描線 */
 .scanlines{
   pointer-events:none;
   position:absolute;
@@ -35,8 +31,8 @@ canvas{
   height:100%;
   background:repeating-linear-gradient(
     to bottom,
-    rgba(0,0,0,0.2) 0px,
-    rgba(0,0,0,0.2) 1px,
+    rgba(0,0,0,0.15) 0px,
+    rgba(0,0,0,0.15) 1px,
     transparent 2px,
     transparent 3px
   );
@@ -57,40 +53,78 @@ ctx.imageSmoothingEnabled = false;
 
 let frame = 0;
 
+/* ===== FC風像素魚 (16x8) ===== */
+const fishFrame1 = [
+"0000111111110000",
+"0001112222211100",
+"0011222222222110",
+"0122222222222211",
+"0122222222222211",
+"0011222222222110",
+"0001112222211100",
+"0000111111110000"
+];
+
+const fishFrame2 = [
+"0000111111110000",
+"0001112222211000",
+"0011222222221000",
+"0122222222221100",
+"0122222222221100",
+"0011222222221000",
+"0001112222211000",
+"0000111111110000"
+];
+
+/* NES風限制色 */
+const palette = {
+  "0": null,
+  "1": "#0c0c0c",   // 深色輪廓
+  "2": "#2f2f2f"    // 魚身
+};
+
+function drawFish(x,y){
+  const sprite = (frame%30<15)?fishFrame1:fishFrame2;
+
+  for(let row=0; row<sprite.length; row++){
+    for(let col=0; col<sprite[row].length; col++){
+      const pixel = sprite[row][col];
+      if(palette[pixel]){
+        ctx.fillStyle = palette[pixel];
+        ctx.fillRect(x+col, y+row, 1, 1);
+      }
+    }
+  }
+}
+
 function draw(){
 
   ctx.clearRect(0,0,256,240);
 
-  /* ===== 水面背景（NES風水平條紋） ===== */
+  /* 水面條紋 */
   for(let i=0;i<240;i+=8){
     ctx.fillStyle = i%16===0 ? "#1e90ff" : "#1878d6";
     ctx.fillRect(0,i,256,8);
   }
 
-  /* ===== 魚（簡單擺尾動畫） ===== */
-  let tailOffset = (frame%20<10)?0:2;
+  /* 魚 */
+  drawFish(100,110);
 
-  ctx.fillStyle="#111";
-  ctx.fillRect(100,120,40,8);   // 魚身
-  ctx.fillRect(95+tailOffset,122,5,4);  // 魚尾
-  ctx.fillRect(135,122,4,4);    // 魚頭
-
-  /* ===== 右側張力條（示意值60%） ===== */
+  /* 張力條 */
   ctx.fillStyle="#000";
   ctx.fillRect(230,20,8,200);
-
   ctx.fillStyle="#00ff00";
-  ctx.fillRect(230,140,8,80);
+  ctx.fillRect(230,120,8,100);
 
-  /* ===== 距離數字 ===== */
+  /* 距離 */
   ctx.fillStyle="#000";
   ctx.font="12px monospace";
   ctx.fillText("DIST 085",10,20);
 
-  /* ===== 閃爍驚嘆號 ===== */
+  /* 閃爍 ! */
   if(frame%40<20){
     ctx.fillStyle="#ffff00";
-    ctx.fillText("!",125,100);
+    ctx.fillText("!",120,90);
   }
 
   frame++;
