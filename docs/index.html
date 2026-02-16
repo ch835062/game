@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角地圖（水面）</title>
+<title>2.5D 等角地圖（水中魚影）</title>
 <style>
 body{
   margin:0;
@@ -29,7 +29,7 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// 地圖設定
+// ===== 地圖設定 =====
 const mapRows = 8;
 const mapCols = 8;
 
@@ -46,6 +46,7 @@ const map = [
   [1,1,1,1,1,1,1,1],
 ];
 
+// ===== 等角轉換 =====
 function isoToScreen(x, y, tileW, tileH){
   return {
     x: (x - y) * tileW / 2,
@@ -53,22 +54,37 @@ function isoToScreen(x, y, tileW, tileH){
   };
 }
 
+// ===== 魚物件 =====
+let fishes = [];
+
+function createFish(){
+  return {
+    x: 2 + Math.random()*4,
+    y: 2 + Math.random()*4,
+    vx: (Math.random()-0.5)*0.02,
+    vy: (Math.random()-0.5)*0.02,
+  };
+}
+
+// 建立幾隻魚
+for(let i=0;i<6;i++){
+  fishes.push(createFish());
+}
+
 let time = 0;
 
 function drawTile(x, y, tileW, tileH, height, type){
 
   const pos = isoToScreen(x, y, tileW, tileH);
-
   const centerX = canvas.width/2;
   const centerY = canvas.height/4;
 
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  // 水面波動
   let wave = 0;
   if(type === 0){
-    wave = Math.sin(time + x + y) * 5;
+    wave = Math.sin(time + x + y) * 4;
   }
 
   const h = type === 1 ? height : height/4;
@@ -84,7 +100,6 @@ function drawTile(x, y, tileW, tileH, height, type){
   ctx.fill();
 
   if(type === 1){
-    // 左側
     ctx.fillStyle = "#388e3c";
     ctx.beginPath();
     ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
@@ -94,7 +109,6 @@ function drawTile(x, y, tileW, tileH, height, type){
     ctx.closePath();
     ctx.fill();
 
-    // 右側
     ctx.fillStyle = "#2e7d32";
     ctx.beginPath();
     ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
@@ -104,6 +118,33 @@ function drawTile(x, y, tileW, tileH, height, type){
     ctx.closePath();
     ctx.fill();
   }
+}
+
+// ===== 畫魚 =====
+function drawFish(tileW, tileH){
+
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
+
+  fishes.forEach(fish => {
+
+    fish.x += fish.vx;
+    fish.y += fish.vy;
+
+    // 簡單邊界反彈（水區大約2~5）
+    if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
+    if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
+
+    const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
+
+    const screenX = pos.x + centerX;
+    const screenY = pos.y + centerY - tileW/4;
+
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(screenX, screenY, tileW/6, tileH/4, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
 }
 
 function render(){
@@ -118,6 +159,8 @@ function render(){
       drawTile(x, y, tileW, tileH, height, map[y][x]);
     }
   }
+
+  drawFish(tileW, tileH);
 
   time += 0.05;
   requestAnimationFrame(render);
