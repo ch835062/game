@@ -3,13 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角地圖（真立方體水面）</title>
+<title>2.5D 等角釣魚場景</title>
 <style>
-body{
-  margin:0;
-  background:#111;
-  overflow:hidden;
-}
+body{ margin:0; background:#111; overflow:hidden; }
 canvas{ display:block; }
 </style>
 </head>
@@ -31,16 +27,15 @@ resize();
 const mapRows = 8;
 const mapCols = 8;
 
-// 0=水 1=地
 const map = [
   [1,1,1,1,1,1,1,1],
   [1,1,1,0,0,1,1,1],
   [1,1,0,0,0,0,1,1],
   [1,0,0,0,0,0,0,1],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
 ];
 
 function isoToScreen(x, y, tileW, tileH){
@@ -49,6 +44,12 @@ function isoToScreen(x, y, tileW, tileH){
     y: (x + y) * tileH / 2
   };
 }
+
+// ===== 角色位置（岸邊）=====
+const player = {
+  x: 2,
+  y: 1
+};
 
 let time = 0;
 
@@ -61,7 +62,7 @@ function drawCube(x, y, tileW, tileH, height, colors){
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  // 上面
+  // 上
   ctx.fillStyle = colors.top;
   ctx.beginPath();
   ctx.moveTo(screenX, screenY - height);
@@ -71,7 +72,7 @@ function drawCube(x, y, tileW, tileH, height, colors){
   ctx.closePath();
   ctx.fill();
 
-  // 左側
+  // 左
   ctx.fillStyle = colors.left;
   ctx.beginPath();
   ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - height);
@@ -81,7 +82,7 @@ function drawCube(x, y, tileW, tileH, height, colors){
   ctx.closePath();
   ctx.fill();
 
-  // 右側
+  // 右
   ctx.fillStyle = colors.right;
   ctx.beginPath();
   ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - height);
@@ -92,9 +93,35 @@ function drawCube(x, y, tileW, tileH, height, colors){
   ctx.fill();
 }
 
+// ===== 畫角色 =====
+function drawPlayer(tileW, tileH, landHeight){
+
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
+
+  const pos = isoToScreen(player.x, player.y, tileW, tileH);
+  const screenX = pos.x + centerX;
+  const screenY = pos.y + centerY;
+
+  const baseY = screenY - landHeight;
+
+  // 身體
+  ctx.fillStyle = "#ff5722";
+  ctx.beginPath();
+  ctx.arc(screenX, baseY - tileH/2, tileW/6, 0, Math.PI*2);
+  ctx.fill();
+
+  // 釣竿
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(screenX, baseY - tileH/2);
+  ctx.lineTo(screenX + tileW/2, baseY - tileH);
+  ctx.stroke();
+}
+
 // ===== 魚 =====
 let fishes = [];
-
 function createFish(){
   return {
     x: 2 + Math.random()*4,
@@ -103,7 +130,6 @@ function createFish(){
     vy: (Math.random()-0.5)*0.02,
   };
 }
-
 for(let i=0;i<6;i++) fishes.push(createFish());
 
 function drawFish(tileW, tileH, waterHeight){
@@ -120,7 +146,6 @@ function drawFish(tileW, tileH, waterHeight){
     if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
 
     const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
-
     const screenX = pos.x + centerX;
     const screenY = pos.y + centerY - waterHeight/2;
 
@@ -138,34 +163,35 @@ function render(){
   const tileH = tileW / 2;
 
   const landHeight = tileW/2;
-  const waterHeight = tileW/3;  // 水比較低
+  const waterHeight = tileW/3;
 
+  // 深度排序 (y + x)
+  let tiles = [];
   for(let y=0; y<mapRows; y++){
     for(let x=0; x<mapCols; x++){
-
-      if(map[y][x] === 1){
-        drawCube(x, y, tileW, tileH, landHeight, {
-          top:"#4caf50",
-          left:"#388e3c",
-          right:"#2e7d32"
-        });
-      }else{
-
-        // 水面波動
-        const wave = Math.sin(time + x + y) * 4;
-
-        drawCube(x, y, tileW, tileH, waterHeight + wave, {
-          top:"#2196f3",
-          left:"#1976d2",
-          right:"#1565c0"
-        });
-      }
+      tiles.push({x,y,type:map[y][x],depth:x+y});
     }
   }
 
-  drawFish(tileW, tileH, waterHeight);
+  tiles.sort((a,b)=>a.depth-b.depth);
 
-  time += 0.05;
+  tiles.forEach(tile=>{
+    if(tile.type===1){
+      drawCube(tile.x,tile.y,tileW,tileH,landHeight,{
+        top:"#4caf50", left:"#388e3c", right:"#2e7d32"
+      });
+    }else{
+      const wave = Math.sin(time + tile.x + tile.y)*4;
+      drawCube(tile.x,tile.y,tileW,tileH,waterHeight+wave,{
+        top:"#2196f3", left:"#1976d2", right:"#1565c0"
+      });
+    }
+  });
+
+  drawFish(tileW,tileH,waterHeight);
+  drawPlayer(tileW,tileH,landHeight);
+
+  time+=0.05;
   requestAnimationFrame(render);
 }
 
