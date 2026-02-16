@@ -3,16 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>釣魚太郎 2.5D 版本</title>
+<title>2.5D 大湖地圖</title>
 <style>
 body{
   margin:0;
   background:#111;
   overflow:hidden;
 }
-canvas{
-  display:block;
-}
+canvas{ display:block; }
 </style>
 </head>
 <body>
@@ -29,23 +27,29 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// ===== 地圖設定 =====
-const mapRows = 8;
-const mapCols = 8;
+// ===== 地圖尺寸加大 =====
+const mapRows = 18;
+const mapCols = 18;
 
-// 0 = 水面
+// 0 = 水
 // 1 = 陸地
-const map = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,0,0,0,0,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1],
-];
+const map = [];
 
+for(let y=0; y<mapRows; y++){
+  let row = [];
+  for(let x=0; x<mapCols; x++){
+
+    // 只保留右下角小區域為陸地
+    if(x > mapCols-4 && y > mapRows-4){
+      row.push(1);
+    }else{
+      row.push(0);
+    }
+  }
+  map.push(row);
+}
+
+// ===== 等角轉換 =====
 function isoToScreen(x, y, tileW, tileH){
   return {
     x: (x - y) * tileW / 2,
@@ -53,62 +57,39 @@ function isoToScreen(x, y, tileW, tileH){
   };
 }
 
-function screenToIso(screenX, screenY, tileW, tileH){
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
-
-  screenX -= centerX;
-  screenY -= centerY;
-
-  const x = (screenY / (tileH/2) + screenX / (tileW/2)) / 2;
-  const y = (screenY / (tileH/2) - screenX / (tileW/2)) / 2;
-
-  return {x, y};
-}
-
 // ===== 魚 =====
 let fishes = [];
-for(let i=0;i<6;i++){
-  fishes.push({
-    x: 2 + Math.random()*4,
-    y: 2 + Math.random()*4,
+function createFish(){
+  return {
+    x: Math.random()*14,
+    y: Math.random()*14,
     vx: (Math.random()-0.5)*0.02,
     vy: (Math.random()-0.5)*0.02,
-  });
+  };
 }
-
-// ===== 浮標 =====
-let bobber = null;
-let hooked = false;
-
-canvas.addEventListener("click", e=>{
-  const tileW = Math.min(canvas.width, canvas.height) / 8;
-  const tileH = tileW/2;
-
-  const iso = screenToIso(e.clientX, e.clientY, tileW, tileH);
-  const tx = Math.floor(iso.x);
-  const ty = Math.floor(iso.y);
-
-  if(map[ty] && map[ty][tx] === 0){
-    bobber = {x: tx+0.5, y: ty+0.5};
-    hooked = false;
-  }
-});
+for(let i=0;i<8;i++) fishes.push(createFish());
 
 let time = 0;
 
 function drawTile(x, y, tileW, tileH, height, type){
+
   const pos = isoToScreen(x, y, tileW, tileH);
+
   const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  const centerY = 100; // 往上固定起點
 
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  let wave = type===0 ? Math.sin(time + x + y)*4 : 0;
-  const h = type===1 ? height : height/4;
+  let wave = 0;
+  if(type === 0){
+    wave = Math.sin(time + x*0.5 + y*0.5) * 3;
+  }
 
-  ctx.fillStyle = type===1 ? "#4caf50" : "#2196f3";
+  const h = type === 1 ? height : height/4;
+
+  // 上面
+  ctx.fillStyle = type === 1 ? "#4caf50" : "#1e88e5";
   ctx.beginPath();
   ctx.moveTo(screenX, screenY - h + wave);
   ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h + wave);
@@ -116,81 +97,68 @@ function drawTile(x, y, tileW, tileH, height, type){
   ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h + wave);
   ctx.closePath();
   ctx.fill();
+
+  if(type === 1){
+    ctx.fillStyle = "#2e7d32";
+    ctx.beginPath();
+    ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
+    ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
+    ctx.lineTo(screenX, screenY);
+    ctx.lineTo(screenX, screenY - h);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1b5e20";
+    ctx.beginPath();
+    ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
+    ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
+    ctx.lineTo(screenX, screenY);
+    ctx.lineTo(screenX, screenY - h);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
+// ===== 魚 =====
 function drawFish(tileW, tileH){
+
   const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  const centerY = 100;
 
-  fishes.forEach(fish=>{
-
-    if(bobber){
-      const dx = bobber.x - fish.x;
-      const dy = bobber.y - fish.y;
-      const dist = Math.hypot(dx, dy);
-
-      if(dist < 1){
-        hooked = true;
-      }
-
-      fish.vx += dx*0.0005;
-      fish.vy += dy*0.0005;
-    }
+  fishes.forEach(fish => {
 
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
-    if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
+    if(fish.x < 0 || fish.x > mapCols-4) fish.vx *= -1;
+    if(fish.y < 0 || fish.y > mapRows-4) fish.vy *= -1;
 
     const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+
+    const screenX = pos.x + centerX;
+    const screenY = pos.y + centerY - tileW/4;
+
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
-    ctx.ellipse(
-      pos.x + centerX,
-      pos.y + centerY - tileW/4,
-      tileW/6,
-      tileH/4,
-      0,0,Math.PI*2
-    );
+    ctx.ellipse(screenX, screenY, tileW/5, tileH/4, 0, 0, Math.PI*2);
     ctx.fill();
   });
-}
-
-function drawBobber(tileW, tileH){
-  if(!bobber) return;
-
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
-
-  const pos = isoToScreen(bobber.x, bobber.y, tileW, tileH);
-
-  ctx.fillStyle = hooked ? "red" : "white";
-  ctx.beginPath();
-  ctx.arc(
-    pos.x + centerX,
-    pos.y + centerY - tileW/4,
-    tileW/8,
-    0,Math.PI*2
-  );
-  ctx.fill();
 }
 
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const tileW = Math.min(canvas.width, canvas.height) / 8;
-  const tileH = tileW/2;
-  const height = tileW/2;
+  const tileW = Math.min(canvas.width, canvas.height) / 10;
+  const tileH = tileW / 2;
+  const height = tileW / 2;
 
-  for(let y=0;y<mapRows;y++){
-    for(let x=0;x<mapCols;x++){
-      drawTile(x,y,tileW,tileH,height,map[y][x]);
+  for(let y=0; y<mapRows; y++){
+    for(let x=0; x<mapCols; x++){
+      drawTile(x, y, tileW, tileH, height, map[y][x]);
     }
   }
 
-  drawFish(tileW,tileH);
-  drawBobber(tileW,tileH);
+  drawFish(tileW, tileH);
 
   time += 0.05;
   requestAnimationFrame(render);
