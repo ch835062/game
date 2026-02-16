@@ -1,154 +1,96 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>復刻釣魚太郎 - 戰鬥釣魚</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>45度立方體畫面</title>
 <style>
-  body {
-    background: #111;
-    color: #eee;
-    font-family: monospace;
-    text-align: center;
-  }
-  #game {
-    margin: 20px auto;
-    width: 400px;
-    height: 300px;
-    border: 4px solid #444;
-    position: relative;
-    background: #222;
-  }
-  .hp-bar, .stamina-bar {
-    width: 300px;
-    height: 16px;
-    border: 2px solid #000;
-    margin: 4px auto;
-    position: relative;
-    background: #400;
-  }
-  .hp-fill, .stamina-fill {
-    height: 100%;
-    background: #0a0;
-    width: 100%;
-  }
-  #fish-sprite, #player-sprite {
-    width: 64px;
-    height: 64px;
-    background: #555;
-    margin: 8px auto;
-  }
-  #actions button {
-    font-size: 16px;
-    margin: 4px;
-    padding: 6px 12px;
-    cursor: pointer;
-  }
-  #log {
-    height: 80px;
-    overflow-y: auto;
-    border-top: 1px solid #555;
-    padding-top: 4px;
-    font-size: 14px;
-    text-align: left;
-    margin-top: 6px;
-  }
+body{
+  margin:0;
+  background:#111;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  overflow:hidden;
+}
+canvas{
+  background:#1a1a1a;
+}
 </style>
-
 </head>
 <body>
 
-<h1>復刻釣魚太郎 — 戰鬥釣魚</h1>
-
-<div id="game">
-  
-  <!-- 魚的生命條 -->
-  <div class="hp-bar"><div id="fish-hp" class="hp-fill"></div></div>
-  <div id="fish-sprite">🐟</div>
-
-  <!-- 玩家耐力 -->
-  <div class="stamina-bar"><div id="player-stam" class="stamina-fill"></div></div>
-  <div id="player-sprite">🎣</div>
-
-  <!-- 動作按鈕 -->
-  <div id="actions">
-    <button onclick="playerAction('reel')">拉線</button>
-    <button onclick="playerAction('hold')">穩住</button>
-    <button onclick="playerAction('power')">強攻</button>
-  </div>
-
-  <!-- 結果 / 訊息 -->
-  <div id="log"></div>
-
-</div>
+<canvas id="game"></canvas>
 
 <script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-/* -------- 遊戲資料 -------- */
-let fish = { hp: 100, maxHp: 100 };
-let player = { stamina: 100, maxStam: 100 };
-let inBattle = false;
+// 自動適應畫面大小
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
 
-/* -------- 更新 UI -------- */
-function updateUI() {
-  document.getElementById("fish-hp").style.width = (fish.hp/fish.maxHp*100)+"%";
-  document.getElementById("player-stam").style.width = (player.stamina/player.maxStam*100)+"%";
+function drawCube(x, y, size){
+
+  const h = size;          // 高
+  const w = size;          // 寬
+  const d = size;          // 深度
+
+  // 45度偏移
+  const offsetX = d * 0.5;
+  const offsetY = d * 0.5;
+
+  // 上面
+  ctx.fillStyle = "#3a86ff";
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w + offsetX, y - offsetY);
+  ctx.lineTo(x + offsetX, y - offsetY);
+  ctx.closePath();
+  ctx.fill();
+
+  // 左側
+  ctx.fillStyle = "#2667cc";
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + offsetX, y - offsetY);
+  ctx.lineTo(x + offsetX, y + h - offsetY);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  ctx.fill();
+
+  // 右側
+  ctx.fillStyle = "#1b4f9c";
+  ctx.beginPath();
+  ctx.moveTo(x + w, y);
+  ctx.lineTo(x + w + offsetX, y - offsetY);
+  ctx.lineTo(x + w + offsetX, y + h - offsetY);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  ctx.fill();
 }
 
-/* -------- 遊戲日誌 -------- */
-function log(msg) {
-  let d = document.getElementById("log");
-  d.innerHTML += msg + "<br>";
-  d.scrollTop = d.scrollHeight;
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // 依畫面大小動態決定立方體大小
+  const size = Math.min(canvas.width, canvas.height) * 0.2;
+
+  const centerX = canvas.width / 2 - size/2;
+  const centerY = canvas.height / 2 + size/2;
+
+  drawCube(centerX, centerY, size);
+
+  requestAnimationFrame(render);
 }
 
-/* -------- 玩家動作 -------- */
-function playerAction(action) {
-  if (!inBattle) return;
-
-  switch(action) {
-    case 'reel':
-      fish.hp -= 15;
-      player.stamina -= 10;
-      log("你拉線！魚受傷了！");
-      break;
-    case 'hold':
-      player.stamina += 10;
-      log("你穩住了釣線，恢復耐力！");
-      break;
-    case 'power':
-      fish.hp -= 30;
-      player.stamina -= 25;
-      log("你使出強攻！");
-      break;
-  }
-
-  if (fish.hp <= 0) {
-    fish.hp = 0;
-    log("🎉 你成功捕獲了魚！");
-    inBattle = false;
-  }
-
-  if (player.stamina <= 0) {
-    player.stamina = 0;
-    log("⛔ 你太累了，魚逃走了！");
-    inBattle = false;
-  }
-
-  updateUI();
-}
-
-/* -------- 開始戰鬥 -------- */
-function startBattle() {
-  fish.hp = 100;
-  player.stamina = 100;
-  inBattle = true;
-  log("⚔️ 戰鬥開始！魚咬住了！");
-  updateUI();
-}
-
-startBattle(); // 一開始就開始戰鬥
-
+render();
 </script>
 
 </body>
