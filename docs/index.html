@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角地圖（水中魚影）</title>
+<title>釣魚太郎 2.5D 版本</title>
 <style>
 body{
   margin:0;
@@ -46,7 +46,6 @@ const map = [
   [1,1,1,1,1,1,1,1],
 ];
 
-// ===== 等角轉換 =====
 function isoToScreen(x, y, tileW, tileH){
   return {
     x: (x - y) * tileW / 2,
@@ -54,27 +53,51 @@ function isoToScreen(x, y, tileW, tileH){
   };
 }
 
-// ===== 魚物件 =====
-let fishes = [];
+function screenToIso(screenX, screenY, tileW, tileH){
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
 
-function createFish(){
-  return {
+  screenX -= centerX;
+  screenY -= centerY;
+
+  const x = (screenY / (tileH/2) + screenX / (tileW/2)) / 2;
+  const y = (screenY / (tileH/2) - screenX / (tileW/2)) / 2;
+
+  return {x, y};
+}
+
+// ===== 魚 =====
+let fishes = [];
+for(let i=0;i<6;i++){
+  fishes.push({
     x: 2 + Math.random()*4,
     y: 2 + Math.random()*4,
     vx: (Math.random()-0.5)*0.02,
     vy: (Math.random()-0.5)*0.02,
-  };
+  });
 }
 
-// 建立幾隻魚
-for(let i=0;i<6;i++){
-  fishes.push(createFish());
-}
+// ===== 浮標 =====
+let bobber = null;
+let hooked = false;
+
+canvas.addEventListener("click", e=>{
+  const tileW = Math.min(canvas.width, canvas.height) / 8;
+  const tileH = tileW/2;
+
+  const iso = screenToIso(e.clientX, e.clientY, tileW, tileH);
+  const tx = Math.floor(iso.x);
+  const ty = Math.floor(iso.y);
+
+  if(map[ty] && map[ty][tx] === 0){
+    bobber = {x: tx+0.5, y: ty+0.5};
+    hooked = false;
+  }
+});
 
 let time = 0;
 
 function drawTile(x, y, tileW, tileH, height, type){
-
   const pos = isoToScreen(x, y, tileW, tileH);
   const centerX = canvas.width/2;
   const centerY = canvas.height/4;
@@ -82,15 +105,10 @@ function drawTile(x, y, tileW, tileH, height, type){
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  let wave = 0;
-  if(type === 0){
-    wave = Math.sin(time + x + y) * 4;
-  }
+  let wave = type===0 ? Math.sin(time + x + y)*4 : 0;
+  const h = type===1 ? height : height/4;
 
-  const h = type === 1 ? height : height/4;
-
-  // 上面
-  ctx.fillStyle = type === 1 ? "#4caf50" : "#2196f3";
+  ctx.fillStyle = type===1 ? "#4caf50" : "#2196f3";
   ctx.beginPath();
   ctx.moveTo(screenX, screenY - h + wave);
   ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h + wave);
@@ -98,69 +116,81 @@ function drawTile(x, y, tileW, tileH, height, type){
   ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h + wave);
   ctx.closePath();
   ctx.fill();
-
-  if(type === 1){
-    ctx.fillStyle = "#388e3c";
-    ctx.beginPath();
-    ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
-    ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
-    ctx.lineTo(screenX, screenY);
-    ctx.lineTo(screenX, screenY - h);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = "#2e7d32";
-    ctx.beginPath();
-    ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
-    ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
-    ctx.lineTo(screenX, screenY);
-    ctx.lineTo(screenX, screenY - h);
-    ctx.closePath();
-    ctx.fill();
-  }
 }
 
-// ===== 畫魚 =====
 function drawFish(tileW, tileH){
-
   const centerX = canvas.width/2;
   const centerY = canvas.height/4;
 
-  fishes.forEach(fish => {
+  fishes.forEach(fish=>{
+
+    if(bobber){
+      const dx = bobber.x - fish.x;
+      const dy = bobber.y - fish.y;
+      const dist = Math.hypot(dx, dy);
+
+      if(dist < 1){
+        hooked = true;
+      }
+
+      fish.vx += dx*0.0005;
+      fish.vy += dy*0.0005;
+    }
 
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 簡單邊界反彈（水區大約2~5）
     if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
     if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
 
     const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
-
-    const screenX = pos.x + centerX;
-    const screenY = pos.y + centerY - tileW/4;
-
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.beginPath();
-    ctx.ellipse(screenX, screenY, tileW/6, tileH/4, 0, 0, Math.PI*2);
+    ctx.ellipse(
+      pos.x + centerX,
+      pos.y + centerY - tileW/4,
+      tileW/6,
+      tileH/4,
+      0,0,Math.PI*2
+    );
     ctx.fill();
   });
+}
+
+function drawBobber(tileW, tileH){
+  if(!bobber) return;
+
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
+
+  const pos = isoToScreen(bobber.x, bobber.y, tileW, tileH);
+
+  ctx.fillStyle = hooked ? "red" : "white";
+  ctx.beginPath();
+  ctx.arc(
+    pos.x + centerX,
+    pos.y + centerY - tileW/4,
+    tileW/8,
+    0,Math.PI*2
+  );
+  ctx.fill();
 }
 
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const tileW = Math.min(canvas.width, canvas.height) / 8;
-  const tileH = tileW / 2;
-  const height = tileW / 2;
+  const tileH = tileW/2;
+  const height = tileW/2;
 
-  for(let y=0; y<mapRows; y++){
-    for(let x=0; x<mapCols; x++){
-      drawTile(x, y, tileW, tileH, height, map[y][x]);
+  for(let y=0;y<mapRows;y++){
+    for(let x=0;x<mapCols;x++){
+      drawTile(x,y,tileW,tileH,height,map[y][x]);
     }
   }
 
-  drawFish(tileW, tileH);
+  drawFish(tileW,tileH);
+  drawBobber(tileW,tileH);
 
   time += 0.05;
   requestAnimationFrame(render);
