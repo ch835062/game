@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角地圖</title>
+<title>2.5D 等角地圖（水面）</title>
 <style>
 body{
   margin:0;
@@ -33,10 +33,18 @@ resize();
 const mapRows = 8;
 const mapCols = 8;
 
-// 地圖陣列（1=地板）
-const map = Array.from({length: mapRows}, () =>
-  Array.from({length: mapCols}, () => 1)
-);
+// 0 = 水面
+// 1 = 陸地
+const map = [
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,0,0,0,0,1,1],
+  [1,0,0,0,0,0,0,1],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
+];
 
 function isoToScreen(x, y, tileW, tileH){
   return {
@@ -45,7 +53,9 @@ function isoToScreen(x, y, tileW, tileH){
   };
 }
 
-function drawTile(x, y, tileW, tileH, height){
+let time = 0;
+
+function drawTile(x, y, tileW, tileH, height, type){
 
   const pos = isoToScreen(x, y, tileW, tileH);
 
@@ -55,37 +65,45 @@ function drawTile(x, y, tileW, tileH, height){
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  const h = height;
+  // 水面波動
+  let wave = 0;
+  if(type === 0){
+    wave = Math.sin(time + x + y) * 5;
+  }
+
+  const h = type === 1 ? height : height/4;
 
   // 上面
-  ctx.fillStyle = "#3a86ff";
+  ctx.fillStyle = type === 1 ? "#4caf50" : "#2196f3";
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY - h);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h);
-  ctx.lineTo(screenX, screenY - tileH - h);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h);
+  ctx.moveTo(screenX, screenY - h + wave);
+  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h + wave);
+  ctx.lineTo(screenX, screenY - tileH - h + wave);
+  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h + wave);
   ctx.closePath();
   ctx.fill();
 
-  // 左側
-  ctx.fillStyle = "#2667cc";
-  ctx.beginPath();
-  ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - h);
-  ctx.closePath();
-  ctx.fill();
+  if(type === 1){
+    // 左側
+    ctx.fillStyle = "#388e3c";
+    ctx.beginPath();
+    ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
+    ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
+    ctx.lineTo(screenX, screenY);
+    ctx.lineTo(screenX, screenY - h);
+    ctx.closePath();
+    ctx.fill();
 
-  // 右側
-  ctx.fillStyle = "#1b4f9c";
-  ctx.beginPath();
-  ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - h);
-  ctx.closePath();
-  ctx.fill();
+    // 右側
+    ctx.fillStyle = "#2e7d32";
+    ctx.beginPath();
+    ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
+    ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
+    ctx.lineTo(screenX, screenY);
+    ctx.lineTo(screenX, screenY - h);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 function render(){
@@ -97,12 +115,11 @@ function render(){
 
   for(let y=0; y<mapRows; y++){
     for(let x=0; x<mapCols; x++){
-      if(map[y][x] === 1){
-        drawTile(x, y, tileW, tileH, height);
-      }
+      drawTile(x, y, tileW, tileH, height, map[y][x]);
     }
   }
 
+  time += 0.05;
   requestAnimationFrame(render);
 }
 
