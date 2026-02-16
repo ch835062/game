@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 大湖地圖</title>
+<title>2.5D 等角地圖（真立方體水面）</title>
 <style>
 body{
   margin:0;
@@ -27,29 +27,22 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// ===== 地圖尺寸加大 =====
-const mapRows = 18;
-const mapCols = 18;
+// ===== 地圖 =====
+const mapRows = 8;
+const mapCols = 8;
 
-// 0 = 水
-// 1 = 陸地
-const map = [];
+// 0=水 1=地
+const map = [
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,0,0,0,0,1,1],
+  [1,0,0,0,0,0,0,1],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
+];
 
-for(let y=0; y<mapRows; y++){
-  let row = [];
-  for(let x=0; x<mapCols; x++){
-
-    // 只保留右下角小區域為陸地
-    if(x > mapCols-4 && y > mapRows-4){
-      row.push(1);
-    }else{
-      row.push(0);
-    }
-  }
-  map.push(row);
-}
-
-// ===== 等角轉換 =====
 function isoToScreen(x, y, tileW, tileH){
   return {
     x: (x - y) * tileW / 2,
@@ -57,90 +50,83 @@ function isoToScreen(x, y, tileW, tileH){
   };
 }
 
-// ===== 魚 =====
-let fishes = [];
-function createFish(){
-  return {
-    x: Math.random()*14,
-    y: Math.random()*14,
-    vx: (Math.random()-0.5)*0.02,
-    vy: (Math.random()-0.5)*0.02,
-  };
-}
-for(let i=0;i<8;i++) fishes.push(createFish());
-
 let time = 0;
 
-function drawTile(x, y, tileW, tileH, height, type){
+function drawCube(x, y, tileW, tileH, height, colors){
 
   const pos = isoToScreen(x, y, tileW, tileH);
-
   const centerX = canvas.width/2;
-  const centerY = 100; // 往上固定起點
+  const centerY = canvas.height/4;
 
   const screenX = pos.x + centerX;
   const screenY = pos.y + centerY;
 
-  let wave = 0;
-  if(type === 0){
-    wave = Math.sin(time + x*0.5 + y*0.5) * 3;
-  }
-
-  const h = type === 1 ? height : height/4;
-
   // 上面
-  ctx.fillStyle = type === 1 ? "#4caf50" : "#1e88e5";
+  ctx.fillStyle = colors.top;
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY - h + wave);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h + wave);
-  ctx.lineTo(screenX, screenY - tileH - h + wave);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h + wave);
+  ctx.moveTo(screenX, screenY - height);
+  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - height);
+  ctx.lineTo(screenX, screenY - tileH - height);
+  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - height);
   ctx.closePath();
   ctx.fill();
 
-  if(type === 1){
-    ctx.fillStyle = "#2e7d32";
-    ctx.beginPath();
-    ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
-    ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
-    ctx.lineTo(screenX, screenY);
-    ctx.lineTo(screenX, screenY - h);
-    ctx.closePath();
-    ctx.fill();
+  // 左側
+  ctx.fillStyle = colors.left;
+  ctx.beginPath();
+  ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - height);
+  ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
+  ctx.lineTo(screenX, screenY);
+  ctx.lineTo(screenX, screenY - height);
+  ctx.closePath();
+  ctx.fill();
 
-    ctx.fillStyle = "#1b5e20";
-    ctx.beginPath();
-    ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
-    ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
-    ctx.lineTo(screenX, screenY);
-    ctx.lineTo(screenX, screenY - h);
-    ctx.closePath();
-    ctx.fill();
-  }
+  // 右側
+  ctx.fillStyle = colors.right;
+  ctx.beginPath();
+  ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - height);
+  ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
+  ctx.lineTo(screenX, screenY);
+  ctx.lineTo(screenX, screenY - height);
+  ctx.closePath();
+  ctx.fill();
 }
 
 // ===== 魚 =====
-function drawFish(tileW, tileH){
+let fishes = [];
+
+function createFish(){
+  return {
+    x: 2 + Math.random()*4,
+    y: 2 + Math.random()*4,
+    vx: (Math.random()-0.5)*0.02,
+    vy: (Math.random()-0.5)*0.02,
+  };
+}
+
+for(let i=0;i<6;i++) fishes.push(createFish());
+
+function drawFish(tileW, tileH, waterHeight){
 
   const centerX = canvas.width/2;
-  const centerY = 100;
+  const centerY = canvas.height/4;
 
   fishes.forEach(fish => {
 
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    if(fish.x < 0 || fish.x > mapCols-4) fish.vx *= -1;
-    if(fish.y < 0 || fish.y > mapRows-4) fish.vy *= -1;
+    if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
+    if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
 
     const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
 
     const screenX = pos.x + centerX;
-    const screenY = pos.y + centerY - tileW/4;
+    const screenY = pos.y + centerY - waterHeight/2;
 
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
-    ctx.ellipse(screenX, screenY, tileW/5, tileH/4, 0, 0, Math.PI*2);
+    ctx.ellipse(screenX, screenY, tileW/6, tileH/4, 0, 0, Math.PI*2);
     ctx.fill();
   });
 }
@@ -148,17 +134,36 @@ function drawFish(tileW, tileH){
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const tileW = Math.min(canvas.width, canvas.height) / 10;
+  const tileW = Math.min(canvas.width, canvas.height) / 8;
   const tileH = tileW / 2;
-  const height = tileW / 2;
+
+  const landHeight = tileW/2;
+  const waterHeight = tileW/3;  // 水比較低
 
   for(let y=0; y<mapRows; y++){
     for(let x=0; x<mapCols; x++){
-      drawTile(x, y, tileW, tileH, height, map[y][x]);
+
+      if(map[y][x] === 1){
+        drawCube(x, y, tileW, tileH, landHeight, {
+          top:"#4caf50",
+          left:"#388e3c",
+          right:"#2e7d32"
+        });
+      }else{
+
+        // 水面波動
+        const wave = Math.sin(time + x + y) * 4;
+
+        drawCube(x, y, tileW, tileH, waterHeight + wave, {
+          top:"#2196f3",
+          left:"#1976d2",
+          right:"#1565c0"
+        });
+      }
     }
   }
 
-  drawFish(tileW, tileH);
+  drawFish(tileW, tileH, waterHeight);
 
   time += 0.05;
   requestAnimationFrame(render);
