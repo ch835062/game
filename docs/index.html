@@ -3,31 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>45度立方體畫面</title>
+<title>2.5D 等角地圖</title>
 <style>
 body{
   margin:0;
   background:#111;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
   overflow:hidden;
 }
 canvas{
-  background:#1a1a1a;
+  display:block;
 }
 </style>
 </head>
 <body>
-
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// 自動適應畫面大小
 function resize(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -35,43 +29,61 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-function drawCube(x, y, size){
+// 地圖設定
+const mapRows = 8;
+const mapCols = 8;
 
-  const h = size;          // 高
-  const w = size;          // 寬
-  const d = size;          // 深度
+// 地圖陣列（1=地板）
+const map = Array.from({length: mapRows}, () =>
+  Array.from({length: mapCols}, () => 1)
+);
 
-  // 45度偏移
-  const offsetX = d * 0.5;
-  const offsetY = d * 0.5;
+function isoToScreen(x, y, tileW, tileH){
+  return {
+    x: (x - y) * tileW / 2,
+    y: (x + y) * tileH / 2
+  };
+}
+
+function drawTile(x, y, tileW, tileH, height){
+
+  const pos = isoToScreen(x, y, tileW, tileH);
+
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
+
+  const screenX = pos.x + centerX;
+  const screenY = pos.y + centerY;
+
+  const h = height;
 
   // 上面
   ctx.fillStyle = "#3a86ff";
   ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w + offsetX, y - offsetY);
-  ctx.lineTo(x + offsetX, y - offsetY);
+  ctx.moveTo(screenX, screenY - h);
+  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - h);
+  ctx.lineTo(screenX, screenY - tileH - h);
+  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - h);
   ctx.closePath();
   ctx.fill();
 
   // 左側
   ctx.fillStyle = "#2667cc";
   ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + offsetX, y - offsetY);
-  ctx.lineTo(x + offsetX, y + h - offsetY);
-  ctx.lineTo(x, y + h);
+  ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - h);
+  ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
+  ctx.lineTo(screenX, screenY);
+  ctx.lineTo(screenX, screenY - h);
   ctx.closePath();
   ctx.fill();
 
   // 右側
   ctx.fillStyle = "#1b4f9c";
   ctx.beginPath();
-  ctx.moveTo(x + w, y);
-  ctx.lineTo(x + w + offsetX, y - offsetY);
-  ctx.lineTo(x + w + offsetX, y + h - offsetY);
-  ctx.lineTo(x + w, y + h);
+  ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - h);
+  ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
+  ctx.lineTo(screenX, screenY);
+  ctx.lineTo(screenX, screenY - h);
   ctx.closePath();
   ctx.fill();
 }
@@ -79,19 +91,22 @@ function drawCube(x, y, size){
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // 依畫面大小動態決定立方體大小
-  const size = Math.min(canvas.width, canvas.height) * 0.2;
+  const tileW = Math.min(canvas.width, canvas.height) / 8;
+  const tileH = tileW / 2;
+  const height = tileW / 2;
 
-  const centerX = canvas.width / 2 - size/2;
-  const centerY = canvas.height / 2 + size/2;
-
-  drawCube(centerX, centerY, size);
+  for(let y=0; y<mapRows; y++){
+    for(let x=0; x<mapCols; x++){
+      if(map[y][x] === 1){
+        drawTile(x, y, tileW, tileH, height);
+      }
+    }
+  }
 
   requestAnimationFrame(render);
 }
 
 render();
 </script>
-
 </body>
 </html>
