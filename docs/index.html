@@ -3,199 +3,169 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角釣魚場景</title>
+<title>3D 水族箱世界</title>
+
 <style>
-body{ margin:0; background:#111; overflow:hidden; }
-canvas{ display:block; }
+body{
+  margin:0;
+  background:#000;
+  overflow:hidden;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+/* 3D 視角 */
+.scene{
+  perspective: 1200px;
+  width:100vw;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+/* 立方體 */
+.cube{
+  position:relative;
+  transform-style: preserve-3d;
+  transition: transform 1.2s ease;
+}
+
+/* 共用面 */
+.face{
+  position:absolute;
+  background: rgba(0,150,255,0.08);
+  border:1px solid rgba(0,200,255,0.3);
+  box-shadow:0 0 25px rgba(0,150,255,0.3);
+  backdrop-filter: blur(4px);
+}
+
+/* Canvas 填滿 */
+.face canvas{
+  width:100%;
+  height:100%;
+  display:block;
+}
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+
+<div class="scene">
+  <div class="cube" id="cube">
+    <div class="face top">
+      <canvas id="mapCanvas"></canvas>
+    </div>
+    <div class="face front">
+      <canvas id="shallowCanvas"></canvas>
+    </div>
+    <div class="face right">
+      <canvas id="deepCanvas"></canvas>
+    </div>
+  </div>
+</div>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const cube = document.getElementById("cube");
+const topFace = document.querySelector(".top");
+const frontFace = document.querySelector(".front");
+const rightFace = document.querySelector(".right");
 
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
+function resizeCube(){
 
-// ===== 地圖 =====
-const mapRows = 8;
-const mapCols = 8;
+  const size = Math.min(window.innerWidth, window.innerHeight) * 0.7;
 
-const map = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,0,0,0,0,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1],
-];
+  const topHeight = size * 0.25;
+  const shallowHeight = size * 0.25;
+  const deepHeight = size * 0.45;
 
-function isoToScreen(x, y, tileW, tileH){
-  return {
-    x: (x - y) * tileW / 2,
-    y: (x + y) * tileH / 2
-  };
-}
+  const totalHeight = topHeight + shallowHeight + deepHeight;
 
-// ===== 角色位置（岸邊）=====
-const player = {
-  x: 2,
-  y: 1
-};
+  cube.style.width = size + "px";
+  cube.style.height = totalHeight + "px";
 
-let time = 0;
+  // Top face
+  topFace.style.width = size + "px";
+  topFace.style.height = topHeight + "px";
+  topFace.style.transform =
+    `rotateX(90deg) translateZ(${totalHeight/2}px)`;
 
-function drawCube(x, y, tileW, tileH, height, colors){
+  // Front face
+  frontFace.style.width = size + "px";
+  frontFace.style.height = totalHeight + "px";
+  frontFace.style.transform =
+    `translateZ(${size/2}px)`;
 
-  const pos = isoToScreen(x, y, tileW, tileH);
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  // Right face
+  rightFace.style.width = size + "px";
+  rightFace.style.height = totalHeight + "px";
+  rightFace.style.transform =
+    `rotateY(90deg) translateZ(${size/2}px)`;
 
-  const screenX = pos.x + centerX;
-  const screenY = pos.y + centerY;
-
-  // 上
-  ctx.fillStyle = colors.top;
-  ctx.beginPath();
-  ctx.moveTo(screenX, screenY - height);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX, screenY - tileH - height);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - height);
-  ctx.closePath();
-  ctx.fill();
-
-  // 左
-  ctx.fillStyle = colors.left;
-  ctx.beginPath();
-  ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - height);
-  ctx.closePath();
-  ctx.fill();
-
-  // 右
-  ctx.fillStyle = colors.right;
-  ctx.beginPath();
-  ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - height);
-  ctx.closePath();
-  ctx.fill();
+  // 初始角度
+  cube.style.transform =
+    "rotateX(20deg) rotateY(45deg)";
 }
 
-// ===== 畫角色 =====
-function drawPlayer(tileW, tileH, landHeight){
+window.addEventListener("resize", resizeCube);
+resizeCube();
 
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
 
-  const pos = isoToScreen(player.x, player.y, tileW, tileH);
-  const screenX = pos.x + centerX;
-  const screenY = pos.y + centerY;
+// ===== 測試繪圖 =====
 
-  const baseY = screenY - landHeight;
+function drawTest(){
 
-  // 身體
-  ctx.fillStyle = "#ff5722";
-  ctx.beginPath();
-  ctx.arc(screenX, baseY - tileH/2, tileW/6, 0, Math.PI*2);
-  ctx.fill();
+  const mapCtx = mapCanvas.getContext("2d");
+  const shallowCtx = shallowCanvas.getContext("2d");
+  const deepCtx = deepCanvas.getContext("2d");
 
-  // 釣竿
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(screenX, baseY - tileH/2);
-  ctx.lineTo(screenX + tileW/2, baseY - tileH);
-  ctx.stroke();
+  mapCanvas.width = mapCanvas.clientWidth;
+  mapCanvas.height = mapCanvas.clientHeight;
+
+  shallowCanvas.width = shallowCanvas.clientWidth;
+  shallowCanvas.height = shallowCanvas.clientHeight;
+
+  deepCanvas.width = deepCanvas.clientWidth;
+  deepCanvas.height = deepCanvas.clientHeight;
+
+  // 上層
+  mapCtx.fillStyle = "#2e7d32";
+  mapCtx.fillRect(0,0,mapCanvas.width,mapCanvas.height);
+
+  // 淺水
+  const g1 = shallowCtx.createLinearGradient(0,0,0,shallowCanvas.height);
+  g1.addColorStop(0,"#4fc3f7");
+  g1.addColorStop(1,"#0288d1");
+  shallowCtx.fillStyle = g1;
+  shallowCtx.fillRect(0,0,shallowCanvas.width,shallowCanvas.height);
+
+  // 深水
+  const g2 = deepCtx.createLinearGradient(0,0,0,deepCanvas.height);
+  g2.addColorStop(0,"#01579b");
+  g2.addColorStop(1,"#001f3f");
+  deepCtx.fillStyle = g2;
+  deepCtx.fillRect(0,0,deepCanvas.width,deepCanvas.height);
 }
 
-// ===== 魚 =====
-let fishes = [];
-function createFish(){
-  return {
-    x: 2 + Math.random()*4,
-    y: 2 + Math.random()*4,
-    vx: (Math.random()-0.5)*0.02,
-    vy: (Math.random()-0.5)*0.02,
-  };
-}
-for(let i=0;i<6;i++) fishes.push(createFish());
+drawTest();
 
-function drawFish(tileW, tileH, waterHeight){
 
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
-
-  fishes.forEach(fish => {
-
-    fish.x += fish.vx;
-    fish.y += fish.vy;
-
-    if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
-    if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
-
-    const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
-    const screenX = pos.x + centerX;
-    const screenY = pos.y + centerY - waterHeight/2;
-
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath();
-    ctx.ellipse(screenX, screenY, tileW/6, tileH/4, 0, 0, Math.PI*2);
-    ctx.fill();
-  });
+// ===== 戰鬥測試旋轉 =====
+function battleView(){
+  cube.style.transform =
+    "rotateX(10deg) rotateY(20deg) scale(1.1)";
 }
 
-function render(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const tileW = Math.min(canvas.width, canvas.height) / 8;
-  const tileH = tileW / 2;
-
-  const landHeight = tileW/2;
-  const waterHeight = tileW/3;
-
-  // 深度排序 (y + x)
-  let tiles = [];
-  for(let y=0; y<mapRows; y++){
-    for(let x=0; x<mapCols; x++){
-      tiles.push({x,y,type:map[y][x],depth:x+y});
-    }
-  }
-
-  tiles.sort((a,b)=>a.depth-b.depth);
-
-  tiles.forEach(tile=>{
-    if(tile.type===1){
-      drawCube(tile.x,tile.y,tileW,tileH,landHeight,{
-        top:"#4caf50", left:"#388e3c", right:"#2e7d32"
-      });
-    }else{
-      const wave = Math.sin(time + tile.x + tile.y)*4;
-      drawCube(tile.x,tile.y,tileW,tileH,waterHeight+wave,{
-        top:"#2196f3", left:"#1976d2", right:"#1565c0"
-      });
-    }
-  });
-
-  drawFish(tileW,tileH,waterHeight);
-  drawPlayer(tileW,tileH,landHeight);
-
-  time+=0.05;
-  requestAnimationFrame(render);
+function normalView(){
+  cube.style.transform =
+    "rotateX(20deg) rotateY(45deg) scale(1)";
 }
 
-render();
+// 測試：3秒後切戰鬥視角
+setTimeout(battleView,3000);
+setTimeout(normalView,6000);
+
 </script>
 </body>
 </html>
