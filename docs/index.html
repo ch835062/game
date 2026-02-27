@@ -3,74 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>小立方體堆疊大立方體</title>
+<title>巨大立方體水世界</title>
 <style>
-body{margin:0;background:#111;overflow:hidden;}
-canvas{display:block;}
+body{ margin:0; background:#111; overflow:hidden; }
+canvas{ display:block; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
 function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
-window.addEventListener("resize",resize);
+window.addEventListener("resize", resize);
 resize();
 
-function iso(x,y,z,tileW,tileH,tileZ){
-  return{
-    x:(x-y)*tileW/2,
-    y:(x+y)*tileH/2 - z*tileZ
-  }
+// ===== 地圖最上層 =====
+const mapRows = 8;
+const mapCols = 8;
+
+const topMap = [
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,0,0,0,0,1,1],
+  [1,0,0,0,0,0,0,1],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
+];
+
+// ===== 等角轉換 =====
+function isoToScreen(x, y, z, tileW, tileH, tileZ){
+  return {
+    x: (x - y) * tileW / 2,
+    y: (x + y) * tileH / 2 - z * tileZ
+  };
 }
 
-const size=6;      // X,Y 寬度
-const height=4;    // Z 高度
+function drawCube(x,y,z,tileW,tileH,tileZ,colors){
 
-let time=0;
+  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
+  const centerX = canvas.width/2;
+  const centerY = canvas.height/4;
 
-function drawCube(x,y,z,tileW,tileH,tileZ,color){
-
-  const p=iso(x,y,z,tileW,tileH,tileZ);
-  const cx=canvas.width/2;
-  const cy=canvas.height/3;
-
-  const sx=p.x+cx;
-  const sy=p.y+cy;
+  const sx = pos.x + centerX;
+  const sy = pos.y + centerY;
 
   // 上
-  ctx.fillStyle=color.top;
+  ctx.fillStyle = colors.top;
   ctx.beginPath();
-  ctx.moveTo(sx,sy);
-  ctx.lineTo(sx+tileW/2,sy-tileH/2);
-  ctx.lineTo(sx,sy-tileH);
-  ctx.lineTo(sx-tileW/2,sy-tileH/2);
+  ctx.moveTo(sx, sy - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx, sy - tileH - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
   ctx.closePath();
   ctx.fill();
 
   // 左
-  ctx.fillStyle=color.left;
+  ctx.fillStyle = colors.left;
   ctx.beginPath();
-  ctx.moveTo(sx-tileW/2,sy-tileH/2);
-  ctx.lineTo(sx-tileW/2,sy-tileH/2+tileZ);
-  ctx.lineTo(sx,sy+tileZ);
-  ctx.lineTo(sx,sy);
+  ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
   ctx.closePath();
   ctx.fill();
 
   // 右
-  ctx.fillStyle=color.right;
+  ctx.fillStyle = colors.right;
   ctx.beginPath();
-  ctx.moveTo(sx+tileW/2,sy-tileH/2);
-  ctx.lineTo(sx+tileW/2,sy-tileH/2+tileZ);
-  ctx.lineTo(sx,sy+tileZ);
-  ctx.lineTo(sx,sy);
+  ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
   ctx.closePath();
   ctx.fill();
 }
@@ -78,68 +89,51 @@ function drawCube(x,y,z,tileW,tileH,tileZ,color){
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const tileW=Math.min(canvas.width,canvas.height)/12;
-  const tileH=tileW/2;
-  const tileZ=tileW/2;
+  const tileW = Math.min(canvas.width, canvas.height)/8;
+  const tileH = tileW/2;
+  const tileZ = tileW/2;
 
-  let cubes=[];
+  // 🔥 自動計算層數直到畫面底部
+  const maxLayers = Math.ceil(canvas.height / tileZ);
 
-  for(let x=0;x<size;x++){
-    for(let y=0;y<size;y++){
-      for(let z=0;z<height;z++){
+  let cubes = [];
 
-        // 中央挖空形成水池
-        if(
-          x>=2&&x<=3 &&
-          y>=2&&y<=3 &&
-          z>=2
-        ){
-          continue;
+  for(let z=0; z<maxLayers; z++){
+    for(let y=0; y<mapRows; y++){
+      for(let x=0; x<mapCols; x++){
+
+        let type;
+
+        if(z===0){
+          type = topMap[y][x]; // 最上層保留原本
+        }else{
+          type = 0; // 下層全水
         }
 
-        cubes.push({x,y,z});
+        cubes.push({x,y,z,type,depth:x+y+z});
       }
     }
   }
 
   // 深度排序
-  cubes.sort((a,b)=>{
-    return (a.x+a.y+a.z)-(b.x+b.y+b.z);
-  });
+  cubes.sort((a,b)=>a.depth-b.depth);
 
   cubes.forEach(c=>{
-
-    let color={
-      top:"#4caf50",
-      left:"#388e3c",
-      right:"#2e7d32"
-    };
-
-    // 底部中央區改為水
-    if(
-      c.x>=2&&c.x<=3 &&
-      c.y>=2&&c.y<=3 &&
-      c.z<2
-    ){
-      const wave=Math.sin(time+c.x+c.y)*3;
-
-      drawCube(
-        c.x,c.y,c.z,
-        tileW,tileH,tileZ,
-        {
-          top:"#4fc3f7",
-          left:"rgba(21,101,192,0.85)",
-          right:"rgba(13,71,161,0.9)"
-        }
-      );
-      return;
+    if(c.type===1){
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#4caf50",
+        left:"#388e3c",
+        right:"#2e7d32"
+      });
+    }else{
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#2196f3",
+        left:"#1976d2",
+        right:"#1565c0"
+      });
     }
-
-    drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,color);
-
   });
 
-  time+=0.05;
   requestAnimationFrame(render);
 }
 
