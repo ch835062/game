@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 水深立方體</title>
+<title>整塊立方體地圖</title>
 <style>
-body{ margin:0; background:#111; overflow:hidden; }
-canvas{ display:block; }
+body{ margin:0; background:#111; overflow:hidden;}
+canvas{ display:block;}
 </style>
 </head>
 <body>
@@ -23,21 +23,7 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-const mapRows = 8;
-const mapCols = 8;
-
-const map = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,0,0,0,0,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1],
-];
-
-function isoToScreen(x,y,tileW,tileH){
+function iso(x,y,tileW,tileH){
   return {
     x:(x-y)*tileW/2,
     y:(x+y)*tileH/2
@@ -46,140 +32,93 @@ function isoToScreen(x,y,tileW,tileH){
 
 let time = 0;
 
-// ===== 改良版水立方體 =====
-function drawWaterCube(x,y,tileW,tileH,depth){
+function drawBigMap(){
 
-  const pos = isoToScreen(x,y,tileW,tileH);
+  const tileW = Math.min(canvas.width,canvas.height)/5;
+  const tileH = tileW/2;
+
+  const mapSize = 6;       // 地圖寬度
+  const height = tileW;    // 地圖厚度
+
   const cx = canvas.width/2;
-  const cy = canvas.height/4;
+  const cy = canvas.height/3;
 
-  const sx = pos.x + cx;
-  const sy = pos.y + cy;
+  const p = iso(mapSize/2,mapSize/2,tileW,tileH);
+  const sx = cx;
+  const sy = cy;
 
-  const wave = Math.sin(time + x + y)*4;
-
-  // 水面（亮）
-  ctx.fillStyle = "#4fc3f7";
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - depth + wave);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2 - depth + wave);
-  ctx.lineTo(sx, sy - tileH - depth + wave);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2 - depth + wave);
-  ctx.closePath();
-  ctx.fill();
-
-  // 左側（水深）
-  ctx.fillStyle = "rgba(21,101,192,0.8)";
-  ctx.beginPath();
-  ctx.moveTo(sx - tileW/2, sy - tileH/2 - depth);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - depth);
-  ctx.closePath();
-  ctx.fill();
-
-  // 右側（水深更暗）
-  ctx.fillStyle = "rgba(13,71,161,0.85)";
-  ctx.beginPath();
-  ctx.moveTo(sx + tileW/2, sy - tileH/2 - depth);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - depth);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawLand(x,y,tileW,tileH,height){
-
-  const pos = isoToScreen(x,y,tileW,tileH);
-  const cx = canvas.width/2;
-  const cy = canvas.height/4;
-
-  const sx = pos.x + cx;
-  const sy = pos.y + cy;
-
+  // ===== 上表面 =====
   ctx.fillStyle="#4caf50";
   ctx.beginPath();
-  ctx.moveTo(sx, sy - height);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2 - height);
-  ctx.lineTo(sx, sy - tileH - height);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2 - height);
+  ctx.moveTo(sx, sy-height);
+  ctx.lineTo(sx+mapSize*tileW/2, sy-mapSize*tileH/2-height);
+  ctx.lineTo(sx, sy-mapSize*tileH-height);
+  ctx.lineTo(sx-mapSize*tileW/2, sy-mapSize*tileH/2-height);
   ctx.closePath();
   ctx.fill();
 
+  // ===== 左側 =====
   ctx.fillStyle="#388e3c";
   ctx.beginPath();
-  ctx.moveTo(sx - tileW/2, sy - tileH/2 - height);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.moveTo(sx-mapSize*tileW/2, sy-mapSize*tileH/2-height);
+  ctx.lineTo(sx-mapSize*tileW/2, sy-mapSize*tileH/2);
   ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - height);
+  ctx.lineTo(sx, sy-height);
   ctx.closePath();
   ctx.fill();
 
+  // ===== 右側 =====
   ctx.fillStyle="#2e7d32";
   ctx.beginPath();
-  ctx.moveTo(sx + tileW/2, sy - tileH/2 - height);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.moveTo(sx+mapSize*tileW/2, sy-mapSize*tileH/2-height);
+  ctx.lineTo(sx+mapSize*tileW/2, sy-mapSize*tileH/2);
   ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - height);
+  ctx.lineTo(sx, sy-height);
   ctx.closePath();
   ctx.fill();
-}
 
-// ===== 魚在更深處 =====
-let fishes=[];
-for(let i=0;i<6;i++){
-  fishes.push({
-    x:2+Math.random()*4,
-    y:2+Math.random()*4,
-    vx:(Math.random()-0.5)*0.02,
-    vy:(Math.random()-0.5)*0.02
-  });
-}
+  // ===== 水池（凹洞）=====
+  const waterSize = 3;
+  const waterDepth = tileW*0.8;
+  const wave = Math.sin(time)*4;
 
-function drawFish(tileW,tileH,depth){
+  const wx = sx;
+  const wy = sy - height + tileH*2;
 
-  const cx = canvas.width/2;
-  const cy = canvas.height/4;
+  // 水面
+  ctx.fillStyle="#4fc3f7";
+  ctx.beginPath();
+  ctx.moveTo(wx, wy-waterDepth+wave);
+  ctx.lineTo(wx+waterSize*tileW/2, wy-waterSize*tileH/2-waterDepth+wave);
+  ctx.lineTo(wx, wy-waterSize*tileH-waterDepth+wave);
+  ctx.lineTo(wx-waterSize*tileW/2, wy-waterSize*tileH/2-waterDepth+wave);
+  ctx.closePath();
+  ctx.fill();
 
-  fishes.forEach(f=>{
-    f.x+=f.vx;
-    f.y+=f.vy;
-    if(f.x<2||f.x>5)f.vx*=-1;
-    if(f.y<2||f.y>5)f.vy*=-1;
+  // 水側面
+  ctx.fillStyle="rgba(21,101,192,0.85)";
+  ctx.beginPath();
+  ctx.moveTo(wx-waterSize*tileW/2, wy-waterSize*tileH/2-waterDepth);
+  ctx.lineTo(wx-waterSize*tileW/2, wy-waterSize*tileH/2);
+  ctx.lineTo(wx, wy);
+  ctx.lineTo(wx, wy-waterDepth);
+  ctx.closePath();
+  ctx.fill();
 
-    const pos=isoToScreen(f.x,f.y,tileW,tileH);
-    const sx=pos.x+cx;
-    const sy=pos.y+cy-depth/1.5; // 在水中更低
+  ctx.fillStyle="rgba(13,71,161,0.9)";
+  ctx.beginPath();
+  ctx.moveTo(wx+waterSize*tileW/2, wy-waterSize*tileH/2-waterDepth);
+  ctx.lineTo(wx+waterSize*tileW/2, wy-waterSize*tileH/2);
+  ctx.lineTo(wx, wy);
+  ctx.lineTo(wx, wy-waterDepth);
+  ctx.closePath();
+  ctx.fill();
 
-    ctx.fillStyle="rgba(0,0,0,0.25)";
-    ctx.beginPath();
-    ctx.ellipse(sx,sy,tileW/6,tileH/4,0,0,Math.PI*2);
-    ctx.fill();
-  });
 }
 
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const tileW=Math.min(canvas.width,canvas.height)/8;
-  const tileH=tileW/2;
-
-  const landHeight=tileW/2;
-  const waterDepth=tileW; // 🔥 加深水高度
-
-  for(let y=0;y<mapRows;y++){
-    for(let x=0;x<mapCols;x++){
-      if(map[y][x]===1){
-        drawLand(x,y,tileW,tileH,landHeight);
-      }else{
-        drawWaterCube(x,y,tileW,tileH,waterDepth);
-      }
-    }
-  }
-
-  drawFish(tileW,tileH,waterDepth);
-
+  drawBigMap();
   time+=0.05;
   requestAnimationFrame(render);
 }
