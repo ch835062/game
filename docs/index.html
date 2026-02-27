@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>上下對調巨大立方體世界</title>
+<title>最上層地圖 + 頂部預留10層</title>
 <style>
 body{
   margin:0;
@@ -29,7 +29,7 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// ===== 原本最上層地圖（現在會在最底層）=====
+// ===== 地圖 =====
 const mapRows = 8;
 const mapCols = 8;
 
@@ -44,7 +44,7 @@ const topMap = [
   [1,1,1,1,1,1,1,1],
 ];
 
-// ===== 等角轉換 (加入 z 軸) =====
+// ===== 等角轉換 =====
 function isoToScreen(x, y, z, tileW, tileH, tileZ){
   return {
     x: (x - y) * tileW / 2,
@@ -57,12 +57,12 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
 
   const centerX = canvas.width/2;
-  const centerY = canvas.height * 0.75; // 底部基準
+  const centerY = canvas.height * 0.6;
 
   const sx = pos.x + centerX;
   const sy = pos.y + centerY;
 
-  // 上面
+  // 上
   ctx.fillStyle = colors.top;
   ctx.beginPath();
   ctx.moveTo(sx, sy - tileZ);
@@ -72,7 +72,7 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
   ctx.closePath();
   ctx.fill();
 
-  // 左側
+  // 左
   ctx.fillStyle = colors.left;
   ctx.beginPath();
   ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
@@ -82,7 +82,7 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
   ctx.closePath();
   ctx.fill();
 
-  // 右側
+  // 右
   ctx.fillStyle = colors.right;
   ctx.beginPath();
   ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
@@ -100,22 +100,30 @@ function render(){
   const tileH = tileW/2;
   const tileZ = tileW/2;
 
-  // 🔥 自動計算堆疊層數（直到畫面頂部）
-  const maxLayers = Math.ceil(canvas.height / tileZ);
+  const reservedTopLayers = 10; // 🔥 頂部預留10層
+
+  // 自動算出需要多少層到畫面底部
+  const totalLayers = Math.ceil(canvas.height / tileZ);
+
+  // 地圖所在層（最上層）
+  const mapLayer = totalLayers - reservedTopLayers - 1;
 
   let cubes = [];
 
-  for(let z=0; z<maxLayers; z++){
+  for(let z=0; z<totalLayers; z++){
     for(let y=0; y<mapRows; y++){
       for(let x=0; x<mapCols; x++){
 
-        let type;
+        let type = null;
 
-        // ✅ 最底層才是原本地圖
-        if(z === 0){
-          type = topMap[y][x];
-        }else{
-          type = 0; // 上方全水
+        if(z === mapLayer){
+          type = topMap[y][x]; // 原本地圖在最上層
+        }
+        else if(z < mapLayer){
+          type = 0; // 地圖下方全水
+        }
+        else{
+          continue; // 上方預留空氣
         }
 
         cubes.push({
@@ -129,7 +137,6 @@ function render(){
     }
   }
 
-  // 深度排序
   cubes.sort((a,b)=>a.depth-b.depth);
 
   cubes.forEach(c=>{
