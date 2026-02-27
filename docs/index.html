@@ -1,91 +1,3 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>巨大立方體水世界</title>
-<style>
-body{ margin:0; background:#111; overflow:hidden; }
-canvas{ display:block; }
-</style>
-</head>
-<body>
-<canvas id="game"></canvas>
-
-<script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
-
-// ===== 地圖最上層 =====
-const mapRows = 8;
-const mapCols = 8;
-
-const topMap = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,0,0,0,0,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1],
-];
-
-// ===== 等角轉換 =====
-function isoToScreen(x, y, z, tileW, tileH, tileZ){
-  return {
-    x: (x - y) * tileW / 2,
-    y: (x + y) * tileH / 2 - z * tileZ
-  };
-}
-
-function drawCube(x,y,z,tileW,tileH,tileZ,colors){
-
-  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
-
-  const sx = pos.x + centerX;
-  const sy = pos.y + centerY;
-
-  // 上
-  ctx.fillStyle = colors.top;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - tileZ);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx, sy - tileH - tileZ);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
-  ctx.closePath();
-  ctx.fill();
-
-  // 左
-  ctx.fillStyle = colors.left;
-  ctx.beginPath();
-  ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - tileZ);
-  ctx.closePath();
-  ctx.fill();
-
-  // 右
-  ctx.fillStyle = colors.right;
-  ctx.beginPath();
-  ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - tileZ);
-  ctx.closePath();
-  ctx.fill();
-}
-
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -93,7 +5,6 @@ function render(){
   const tileH = tileW/2;
   const tileZ = tileW/2;
 
-  // 🔥 自動計算層數直到畫面底部
   const maxLayers = Math.ceil(canvas.height / tileZ);
 
   let cubes = [];
@@ -104,40 +15,33 @@ function render(){
 
         let type;
 
-        if(z===0){
-          type = topMap[y][x]; // 最上層保留原本
+        // 🔥 最底層才是原本地圖
+        if(z === maxLayers-1){
+          type = topMap[y][x];
         }else{
-          type = 0; // 下層全水
+          type = 0; // 其他全水
         }
 
-        cubes.push({x,y,z,type,depth:x+y+z});
+        cubes.push({x,y,z,type,depth:x+y+(maxLayers-z)});
       }
     }
   }
 
-  // 深度排序
   cubes.sort((a,b)=>a.depth-b.depth);
 
   cubes.forEach(c=>{
-    if(c.type===1){
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#4caf50",
-        left:"#388e3c",
-        right:"#2e7d32"
-      });
-    }else{
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#2196f3",
-        left:"#1976d2",
-        right:"#1565c0"
-      });
-    }
+    drawCube(
+      c.x,
+      c.y,
+      c.z,
+      tileW,
+      tileH,
+      tileZ,
+      c.type===1
+      ? {top:"#4caf50",left:"#388e3c",right:"#2e7d32"}
+      : {top:"#2196f3",left:"#1976d2",right:"#1565c0"}
+    );
   });
 
   requestAnimationFrame(render);
 }
-
-render();
-</script>
-</body>
-</html>
