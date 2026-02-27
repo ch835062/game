@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2.5D 等角釣魚場景</title>
+<title>2.5D 水深立方體</title>
 <style>
 body{ margin:0; background:#111; overflow:hidden; }
 canvas{ display:block; }
@@ -23,7 +23,6 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// ===== 地圖 =====
 const mapRows = 8;
 const mapCols = 8;
 
@@ -38,120 +37,124 @@ const map = [
   [1,1,1,1,1,1,1,1],
 ];
 
-function isoToScreen(x, y, tileW, tileH){
+function isoToScreen(x,y,tileW,tileH){
   return {
-    x: (x - y) * tileW / 2,
-    y: (x + y) * tileH / 2
+    x:(x-y)*tileW/2,
+    y:(x+y)*tileH/2
   };
 }
-
-// ===== 角色位置（岸邊）=====
-const player = {
-  x: 2,
-  y: 1
-};
 
 let time = 0;
 
-function drawCube(x, y, tileW, tileH, height, colors){
+// ===== 改良版水立方體 =====
+function drawWaterCube(x,y,tileW,tileH,depth){
 
-  const pos = isoToScreen(x, y, tileW, tileH);
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  const pos = isoToScreen(x,y,tileW,tileH);
+  const cx = canvas.width/2;
+  const cy = canvas.height/4;
 
-  const screenX = pos.x + centerX;
-  const screenY = pos.y + centerY;
+  const sx = pos.x + cx;
+  const sy = pos.y + cy;
 
-  // 上
-  ctx.fillStyle = colors.top;
+  const wave = Math.sin(time + x + y)*4;
+
+  // 水面（亮）
+  ctx.fillStyle = "#4fc3f7";
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY - height);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX, screenY - tileH - height);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2 - height);
+  ctx.moveTo(sx, sy - depth + wave);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - depth + wave);
+  ctx.lineTo(sx, sy - tileH - depth + wave);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - depth + wave);
   ctx.closePath();
   ctx.fill();
 
-  // 左
-  ctx.fillStyle = colors.left;
+  // 左側（水深）
+  ctx.fillStyle = "rgba(21,101,192,0.8)";
   ctx.beginPath();
-  ctx.moveTo(screenX - tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX - tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - height);
+  ctx.moveTo(sx - tileW/2, sy - tileH/2 - depth);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - depth);
   ctx.closePath();
   ctx.fill();
 
-  // 右
-  ctx.fillStyle = colors.right;
+  // 右側（水深更暗）
+  ctx.fillStyle = "rgba(13,71,161,0.85)";
   ctx.beginPath();
-  ctx.moveTo(screenX + tileW/2, screenY - tileH/2 - height);
-  ctx.lineTo(screenX + tileW/2, screenY - tileH/2);
-  ctx.lineTo(screenX, screenY);
-  ctx.lineTo(screenX, screenY - height);
+  ctx.moveTo(sx + tileW/2, sy - tileH/2 - depth);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - depth);
   ctx.closePath();
   ctx.fill();
 }
 
-// ===== 畫角色 =====
-function drawPlayer(tileW, tileH, landHeight){
+function drawLand(x,y,tileW,tileH,height){
 
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  const pos = isoToScreen(x,y,tileW,tileH);
+  const cx = canvas.width/2;
+  const cy = canvas.height/4;
 
-  const pos = isoToScreen(player.x, player.y, tileW, tileH);
-  const screenX = pos.x + centerX;
-  const screenY = pos.y + centerY;
+  const sx = pos.x + cx;
+  const sy = pos.y + cy;
 
-  const baseY = screenY - landHeight;
-
-  // 身體
-  ctx.fillStyle = "#ff5722";
+  ctx.fillStyle="#4caf50";
   ctx.beginPath();
-  ctx.arc(screenX, baseY - tileH/2, tileW/6, 0, Math.PI*2);
+  ctx.moveTo(sx, sy - height);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - height);
+  ctx.lineTo(sx, sy - tileH - height);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - height);
+  ctx.closePath();
   ctx.fill();
 
-  // 釣竿
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 2;
+  ctx.fillStyle="#388e3c";
   ctx.beginPath();
-  ctx.moveTo(screenX, baseY - tileH/2);
-  ctx.lineTo(screenX + tileW/2, baseY - tileH);
-  ctx.stroke();
+  ctx.moveTo(sx - tileW/2, sy - tileH/2 - height);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - height);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle="#2e7d32";
+  ctx.beginPath();
+  ctx.moveTo(sx + tileW/2, sy - tileH/2 - height);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - height);
+  ctx.closePath();
+  ctx.fill();
 }
 
-// ===== 魚 =====
-let fishes = [];
-function createFish(){
-  return {
-    x: 2 + Math.random()*4,
-    y: 2 + Math.random()*4,
-    vx: (Math.random()-0.5)*0.02,
-    vy: (Math.random()-0.5)*0.02,
-  };
+// ===== 魚在更深處 =====
+let fishes=[];
+for(let i=0;i<6;i++){
+  fishes.push({
+    x:2+Math.random()*4,
+    y:2+Math.random()*4,
+    vx:(Math.random()-0.5)*0.02,
+    vy:(Math.random()-0.5)*0.02
+  });
 }
-for(let i=0;i<6;i++) fishes.push(createFish());
 
-function drawFish(tileW, tileH, waterHeight){
+function drawFish(tileW,tileH,depth){
 
-  const centerX = canvas.width/2;
-  const centerY = canvas.height/4;
+  const cx = canvas.width/2;
+  const cy = canvas.height/4;
 
-  fishes.forEach(fish => {
+  fishes.forEach(f=>{
+    f.x+=f.vx;
+    f.y+=f.vy;
+    if(f.x<2||f.x>5)f.vx*=-1;
+    if(f.y<2||f.y>5)f.vy*=-1;
 
-    fish.x += fish.vx;
-    fish.y += fish.vy;
+    const pos=isoToScreen(f.x,f.y,tileW,tileH);
+    const sx=pos.x+cx;
+    const sy=pos.y+cy-depth/1.5; // 在水中更低
 
-    if(fish.x < 2 || fish.x > 5) fish.vx *= -1;
-    if(fish.y < 2 || fish.y > 5) fish.vy *= -1;
-
-    const pos = isoToScreen(fish.x, fish.y, tileW, tileH);
-    const screenX = pos.x + centerX;
-    const screenY = pos.y + centerY - waterHeight/2;
-
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillStyle="rgba(0,0,0,0.25)";
     ctx.beginPath();
-    ctx.ellipse(screenX, screenY, tileW/6, tileH/4, 0, 0, Math.PI*2);
+    ctx.ellipse(sx,sy,tileW/6,tileH/4,0,0,Math.PI*2);
     ctx.fill();
   });
 }
@@ -159,37 +162,23 @@ function drawFish(tileW, tileH, waterHeight){
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const tileW = Math.min(canvas.width, canvas.height) / 8;
-  const tileH = tileW / 2;
+  const tileW=Math.min(canvas.width,canvas.height)/8;
+  const tileH=tileW/2;
 
-  const landHeight = tileW/2;
-  const waterHeight = tileW/3;
+  const landHeight=tileW/2;
+  const waterDepth=tileW; // 🔥 加深水高度
 
-  // 深度排序 (y + x)
-  let tiles = [];
-  for(let y=0; y<mapRows; y++){
-    for(let x=0; x<mapCols; x++){
-      tiles.push({x,y,type:map[y][x],depth:x+y});
+  for(let y=0;y<mapRows;y++){
+    for(let x=0;x<mapCols;x++){
+      if(map[y][x]===1){
+        drawLand(x,y,tileW,tileH,landHeight);
+      }else{
+        drawWaterCube(x,y,tileW,tileH,waterDepth);
+      }
     }
   }
 
-  tiles.sort((a,b)=>a.depth-b.depth);
-
-  tiles.forEach(tile=>{
-    if(tile.type===1){
-      drawCube(tile.x,tile.y,tileW,tileH,landHeight,{
-        top:"#4caf50", left:"#388e3c", right:"#2e7d32"
-      });
-    }else{
-      const wave = Math.sin(time + tile.x + tile.y)*4;
-      drawCube(tile.x,tile.y,tileW,tileH,waterHeight+wave,{
-        top:"#2196f3", left:"#1976d2", right:"#1565c0"
-      });
-    }
-  });
-
-  drawFish(tileW,tileH,waterHeight);
-  drawPlayer(tileW,tileH,landHeight);
+  drawFish(tileW,tileH,waterDepth);
 
   time+=0.05;
   requestAnimationFrame(render);
