@@ -3,200 +3,182 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D 釣魚世界</title>
-
+<title>擬真釣魚戰鬥畫面</title>
 <style>
 body{
   margin:0;
   background:#000;
   overflow:hidden;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
 }
-
-.scene{
-  perspective: 1200px;
-  width:100vw;
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-
-.cube{
-  position:relative;
-  transform-style: preserve-3d;
-  transition: transform 1.2s ease;
-}
-
-.face{
-  position:absolute;
-  background: rgba(0,150,255,0.05);
-  border:1px solid rgba(0,200,255,0.25);
-  box-shadow:0 0 25px rgba(0,150,255,0.3);
-  backdrop-filter: blur(4px);
-}
-
-.face canvas{
-  width:100%;
-  height:100%;
-  display:block;
-}
+canvas{ display:block; }
 </style>
 </head>
 <body>
-
-<div class="scene">
-  <div class="cube" id="cube">
-    <div class="face top">
-      <canvas id="mapCanvas"></canvas>
-    </div>
-    <div class="face front">
-      <canvas id="shallowCanvas"></canvas>
-    </div>
-    <div class="face right">
-      <canvas id="deepCanvas"></canvas>
-    </div>
-  </div>
-</div>
+<canvas id="game"></canvas>
 
 <script>
-const cube = document.getElementById("cube");
-const topFace = document.querySelector(".top");
-const frontFace = document.querySelector(".front");
-const rightFace = document.querySelector(".right");
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-const mapCanvas = document.getElementById("mapCanvas");
-const ctx = mapCanvas.getContext("2d");
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
 
-// ===== 立方體尺寸 RWD =====
-function resizeCube(){
+// ===== 魚 =====
+let fish = {
+  x: 0.5,
+  depth: 0.5,  // 0=水面 1=最深
+  vx: 0.002,
+  vdepth: 0.0008
+};
 
-  const size = Math.min(window.innerWidth, window.innerHeight) * 0.7;
+// ===== 張力模擬 =====
+let tension = 0.4;
 
-  const topHeight = size * 0.25;
-  const shallowHeight = size * 0.25;
-  const deepHeight = size * 0.45;
+function drawLand(){
+  const horizon = canvas.height * 0.25;
 
-  const totalHeight = topHeight + shallowHeight + deepHeight;
+  ctx.fillStyle = "#3a5f2a";
+  ctx.fillRect(0,0,canvas.width,horizon);
 
-  cube.style.width = size + "px";
-  cube.style.height = totalHeight + "px";
-
-  topFace.style.width = size + "px";
-  topFace.style.height = topHeight + "px";
-  topFace.style.transform =
-    `rotateX(90deg) translateZ(${totalHeight/2}px)`;
-
-  frontFace.style.width = size + "px";
-  frontFace.style.height = totalHeight + "px";
-  frontFace.style.transform =
-    `translateZ(${size/2}px)`;
-
-  rightFace.style.width = size + "px";
-  rightFace.style.height = totalHeight + "px";
-  rightFace.style.transform =
-    `rotateY(90deg) translateZ(${size/2}px)`;
-
-  cube.style.transform =
-    "rotateX(20deg) rotateY(45deg)";
-
-  resizeMapCanvas();
+  ctx.fillStyle = "#2e4d20";
+  ctx.fillRect(0,horizon-10,canvas.width,10);
 }
 
-window.addEventListener("resize", resizeCube);
+function drawWaterSurface(){
+  const horizon = canvas.height * 0.25;
 
-// ===== 等角地圖 =====
-
-const map = [
-  [1,1,1,1,1,1],
-  [1,1,0,0,1,1],
-  [1,0,0,0,0,1],
-  [1,1,0,0,1,1],
-  [1,1,1,1,1,1],
-];
-
-function resizeMapCanvas(){
-  mapCanvas.width = mapCanvas.clientWidth;
-  mapCanvas.height = mapCanvas.clientHeight;
+  ctx.fillStyle = "#1e88e5";
+  ctx.fillRect(0,horizon,canvas.width,5);
 }
 
-function isoToScreen(x,y,tileW,tileH){
-  return {
-    x:(x-y)*tileW/2,
-    y:(x+y)*tileH/2
-  };
+function drawWaterDepth(){
+
+  const horizon = canvas.height * 0.25;
+
+  // 漸層水深
+  const gradient = ctx.createLinearGradient(
+    0,horizon,
+    0,canvas.height
+  );
+
+  gradient.addColorStop(0,"#2196f3");
+  gradient.addColorStop(0.4,"#1565c0");
+  gradient.addColorStop(0.8,"#0d47a1");
+  gradient.addColorStop(1,"#061a40");
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0,horizon,canvas.width,canvas.height);
 }
 
-let time=0;
-
-function drawMap(){
-
-  ctx.clearRect(0,0,mapCanvas.width,mapCanvas.height);
-
-  const tileW = mapCanvas.width / 6;
-  const tileH = tileW/2;
-  const height = tileW/2;
-
-  const centerX = mapCanvas.width/2;
-  const centerY = mapCanvas.height/2;
-
-  for(let y=0;y<map.length;y++){
-    for(let x=0;x<map[0].length;x++){
-
-      const pos = isoToScreen(x,y,tileW,tileH);
-
-      const sx = pos.x + centerX;
-      const sy = pos.y + centerY;
-
-      const wave = map[y][x]===0 ? Math.sin(time+x+y)*3 : 0;
-      const h = map[y][x]===1 ? height : height/3;
-
-      const topColor = map[y][x]===1 ? "#4caf50" : "#2196f3";
-      const leftColor = map[y][x]===1 ? "#388e3c" : "#1976d2";
-      const rightColor= map[y][x]===1 ? "#2e7d32" : "#1565c0";
-
-      // top
-      ctx.fillStyle = topColor;
-      ctx.beginPath();
-      ctx.moveTo(sx,sy-h+wave);
-      ctx.lineTo(sx+tileW/2,sy-tileH/2-h+wave);
-      ctx.lineTo(sx,sy-tileH-h+wave);
-      ctx.lineTo(sx-tileW/2,sy-tileH/2-h+wave);
-      ctx.closePath();
-      ctx.fill();
-
-      // left
-      ctx.fillStyle = leftColor;
-      ctx.beginPath();
-      ctx.moveTo(sx-tileW/2,sy-tileH/2-h);
-      ctx.lineTo(sx-tileW/2,sy-tileH/2);
-      ctx.lineTo(sx,sy);
-      ctx.lineTo(sx,sy-h);
-      ctx.closePath();
-      ctx.fill();
-
-      // right
-      ctx.fillStyle = rightColor;
-      ctx.beginPath();
-      ctx.moveTo(sx+tileW/2,sy-tileH/2-h);
-      ctx.lineTo(sx+tileW/2,sy-tileH/2);
-      ctx.lineTo(sx,sy);
-      ctx.lineTo(sx,sy-h);
-      ctx.closePath();
-      ctx.fill();
-    }
+function drawParticles(){
+  for(let i=0;i<20;i++){
+    const x = (i*83)%canvas.width;
+    const y = (i*157 + performance.now()*0.02)%canvas.height;
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.beginPath();
+    ctx.arc(x,y,2,0,Math.PI*2);
+    ctx.fill();
   }
-
-  time+=0.05;
-  requestAnimationFrame(drawMap);
 }
 
-resizeCube();
-drawMap();
+function drawFish(){
 
+  const horizon = canvas.height * 0.25;
+  const waterHeight = canvas.height - horizon;
+
+  // 更新魚位置
+  fish.x += fish.vx;
+  fish.depth += fish.vdepth;
+
+  if(fish.x<0.1 || fish.x>0.9) fish.vx *= -1;
+  if(fish.depth<0.1 || fish.depth>0.9) fish.vdepth *= -1;
+
+  // 視差
+  const screenX = fish.x * canvas.width;
+  const screenY = horizon + fish.depth * waterHeight;
+
+  // 深度影響大小
+  const size = 40 + fish.depth*40;
+
+  // 深度影響亮度
+  const alpha = 0.8 - fish.depth*0.6;
+
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+
+  ctx.beginPath();
+  ctx.ellipse(screenX,screenY,size,size*0.5,0,0,Math.PI*2);
+  ctx.fill();
+}
+
+function drawLine(){
+
+  const horizon = canvas.height * 0.25;
+  const rodX = canvas.width*0.2;
+  const rodY = horizon - 40;
+
+  const fishX = fish.x * canvas.width;
+  const fishY = horizon + fish.depth * (canvas.height-horizon);
+
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2 + tension*4;
+
+  ctx.beginPath();
+  ctx.moveTo(rodX,rodY);
+  ctx.lineTo(fishX,fishY);
+  ctx.stroke();
+}
+
+function drawTensionMeter(){
+
+  const x = canvas.width*0.8;
+  const y = canvas.height*0.2;
+  const radius = 60;
+
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(x,y,radius,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.strokeStyle = tension>0.75 ? "red" : "lime";
+  ctx.beginPath();
+  ctx.arc(x,y,radius,-Math.PI/2, -Math.PI/2 + tension*Math.PI*2);
+  ctx.stroke();
+}
+
+function updateTension(){
+
+  // 魚深度越深拉力越大
+  tension += fish.depth*0.002;
+
+  // 自然回彈
+  tension *= 0.995;
+
+  if(tension>1) tension=1;
+  if(tension<0) tension=0;
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawLand();
+  drawWaterDepth();
+  drawWaterSurface();
+  drawParticles();
+  drawFish();
+  drawLine();
+  drawTensionMeter();
+
+  updateTension();
+
+  requestAnimationFrame(render);
+}
+
+render();
 </script>
 </body>
 </html>
