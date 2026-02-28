@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>模型級水體 + 霧化 + 高光</title>
+<title>水面微波 + 體積透明感</title>
 <style>
 body{
   margin:0;
-  background:#0d1117;
+  background:#0b0f14;
   overflow:hidden;
 }
 canvas{
@@ -43,6 +43,8 @@ const topMap = [
   [1,1,1,1,1,1,1,1],
 ];
 
+let time = 0;
+
 function isoToScreen(x, y, z, tileW, tileH, tileZ){
   return {
     x: (x - y) * tileW / 2,
@@ -50,7 +52,7 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=false){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=0){
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
   const centerX = canvas.width/2;
@@ -69,13 +71,13 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=false){
   ctx.closePath();
   ctx.fill();
 
-  // 💎 高光
-  if(highlight){
+  // 🌊 微波高光
+  if(highlight > 0){
     const grad = ctx.createLinearGradient(
       sx - tileW/2, sy - tileH/2 - tileZ,
       sx + tileW/2, sy - tileH/2 - tileZ
     );
-    grad.addColorStop(0, "rgba(255,255,255,0.35)");
+    grad.addColorStop(0, `rgba(255,255,255,${0.25 * highlight})`);
     grad.addColorStop(1, "rgba(255,255,255,0)");
 
     ctx.fillStyle = grad;
@@ -115,17 +117,20 @@ function getWaterColor(z, maxDepth){
 
   const baseHue = 205;
 
-  const lightness = 72 - depthRatio * 42;
-  const saturation = 75 - depthRatio * 25;
+  const lightness = 72 - depthRatio * 45;
+  const saturation = 75 - depthRatio * 30;
 
   return {
     top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
-    left: `hsl(${baseHue}, ${saturation}%, ${lightness - 10}%)`,
-    right: `hsl(${baseHue}, ${saturation}%, ${lightness - 18}%)`
+    left: `hsl(${baseHue}, ${saturation}%, ${lightness - 12}%)`,
+    right: `hsl(${baseHue}, ${saturation}%, ${lightness - 20}%)`
   };
 }
 
 function render(){
+
+  time += 0.03;
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const tileW = Math.min(canvas.width, canvas.height)/8;
@@ -176,10 +181,24 @@ function render(){
       });
     }else{
       const waterColor = getWaterColor(c.z, mapLayer);
-      const isSurface = (c.z === mapLayer - 1);
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, isSurface);
+
+      let highlight = 0;
+
+      // 🌊 表面微波
+      if(c.z === mapLayer - 1){
+        highlight = 0.5 + 0.5 * Math.sin(time + c.x * 0.5 + c.y * 0.5);
+      }
+
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, highlight);
     }
   });
+
+  // 🌫 全域水體淡霧
+  const fog = ctx.createLinearGradient(0,0,0,canvas.height);
+  fog.addColorStop(0, "rgba(0,80,120,0.03)");
+  fog.addColorStop(1, "rgba(0,20,40,0.15)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
   requestAnimationFrame(render);
 }
