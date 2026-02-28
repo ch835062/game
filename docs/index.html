@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>旋轉大立方體世界</title>
+<title>15層空氣 + 半透明水立方體</title>
 <style>
 body{
   margin:0;
@@ -30,7 +30,8 @@ window.addEventListener("resize", resize);
 resize();
 
 // ===== 地圖 =====
-const mapSize = 8;
+const mapRows = 8;
+const mapCols = 8;
 
 const topMap = [
   [1,1,1,1,1,1,1,1],
@@ -43,77 +44,54 @@ const topMap = [
   [1,1,1,1,1,1,1,1],
 ];
 
-let angle = 0;
-
-function rotateY(x,z,angle){
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
+function isoToScreen(x, y, z, tileW, tileH, tileZ){
   return {
-    x: x*cos - z*sin,
-    z: x*sin + z*cos
+    x: (x - y) * tileW / 2,
+    y: (x + y) * tileH / 2 - z * tileZ
   };
 }
 
-function project(x,y,z,scale){
-  const perspective = 800;
-  const factor = perspective / (perspective + z);
-  return {
-    x: x * factor * scale + canvas.width/2,
-    y: y * factor * scale + canvas.height/2,
-    scale: factor
-  };
-}
+function drawCube(x,y,z,tileW,tileH,tileZ,colors,alpha=1){
 
-function drawCube(cx,cy,cz,size,type){
+  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
 
-  const hs = size/2;
+  const centerX = canvas.width/2;
+  const centerY = canvas.height * 0.6;
 
-  let vertices = [
-    [-hs,-hs,-hs],[hs,-hs,-hs],[hs,hs,-hs],[-hs,hs,-hs],
-    [-hs,-hs,hs],[hs,-hs,hs],[hs,hs,hs],[-hs,hs,hs]
-  ];
+  const sx = pos.x + centerX;
+  const sy = pos.y + centerY;
 
-  let projected = [];
+  ctx.globalAlpha = alpha;
 
-  vertices.forEach(v=>{
-    let rx = v[0] + cx;
-    let ry = v[1] + cy;
-    let rz = v[2] + cz;
+  // 上
+  ctx.fillStyle = colors.top;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx, sy - tileH - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.closePath();
+  ctx.fill();
 
-    const r = rotateY(rx,rz,angle);
-    rx = r.x;
-    rz = r.z;
+  // 左
+  ctx.fillStyle = colors.left;
+  ctx.beginPath();
+  ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
+  ctx.closePath();
+  ctx.fill();
 
-    projected.push(project(rx,ry,rz,1));
-  });
-
-  const faces = [
-    [0,1,2,3], // back
-    [4,5,6,7], // front
-    [0,1,5,4], // top
-    [2,3,7,6], // bottom
-    [1,2,6,5], // right
-    [0,3,7,4]  // left
-  ];
-
-  const colors = type===1
-    ? ["#2e7d32","#4caf50","#388e3c","#2e7d32","#1b5e20","#1b5e20"]
-    : ["#1565c0","#2196f3","#1976d2","#1565c0","#0d47a1","#0d47a1"];
-
-  faces.forEach((face,i)=>{
-    ctx.beginPath();
-    ctx.moveTo(projected[face[0]].x, projected[face[0]].y);
-    face.forEach(idx=>{
-      ctx.lineTo(projected[idx].x, projected[idx].y);
-    });
-    ctx.closePath();
-
-    if(type===0) ctx.globalAlpha = 0.55;
-    else ctx.globalAlpha = 1;
-
-    ctx.fillStyle = colors[i];
-    ctx.fill();
-  });
+  // 右
+  ctx.fillStyle = colors.right;
+  ctx.beginPath();
+  ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
+  ctx.closePath();
+  ctx.fill();
 
   ctx.globalAlpha = 1;
 }
@@ -121,17 +99,19 @@ function drawCube(cx,cy,cz,size,type){
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const size = Math.min(canvas.width, canvas.height)/25;
+  const tileW = Math.min(canvas.width, canvas.height)/8;
+  const tileH = tileW/2;
+  const tileZ = tileW/2;
 
-  const reservedTop = 10;
-  const totalLayers = 20;
-  const mapLayer = totalLayers - reservedTop - 1;
+  const reservedTopLayers = 15; // 🔥 改為15層空氣
+  const totalLayers = Math.ceil(canvas.height / tileZ);
+  const mapLayer = totalLayers - reservedTopLayers - 1;
 
   let cubes = [];
 
   for(let z=0; z<totalLayers; z++){
-    for(let y=0; y<mapSize; y++){
-      for(let x=0; x<mapSize; x++){
+    for(let y=0; y<mapRows; y++){
+      for(let x=0; x<mapCols; x++){
 
         let type = null;
 
@@ -139,29 +119,41 @@ function render(){
           type = topMap[y][x];
         }
         else if(z < mapLayer){
-          type = 0;
+          type = 0; // 水
         }
         else{
-          continue;
+          continue; // 空氣
         }
 
         cubes.push({
-          x: (x-mapSize/2)*size*1.1,
-          y: (y-mapSize/2)*size*1.1,
-          z: (z-totalLayers/2)*size*1.1,
-          type
+          x,
+          y,
+          z,
+          type,
+          depth: x + y + z
         });
       }
     }
   }
 
-  cubes.sort((a,b)=>b.z-a.z);
+  cubes.sort((a,b)=>a.depth-b.depth);
 
   cubes.forEach(c=>{
-    drawCube(c.x,c.y,c.z,size,c.type);
+    if(c.type === 1){
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#4caf50",
+        left:"#388e3c",
+        right:"#2e7d32"
+      },1);
+    }else{
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#2196f3",
+        left:"#1976d2",
+        right:"#1565c0"
+      },0.55);
+    }
   });
 
-  angle += 0.01;
   requestAnimationFrame(render);
 }
 
