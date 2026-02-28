@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水面微波 + 體積透明感</title>
+<title>水面上下起伏流動</title>
 <style>
 body{
   margin:0;
@@ -52,14 +52,14 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=0){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0){
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
   const centerX = canvas.width/2;
   const centerY = canvas.height * 0.6;
 
   const sx = pos.x + centerX;
-  const sy = pos.y + centerY;
+  const sy = pos.y + centerY - heightOffset;
 
   // 上
   ctx.fillStyle = colors.top;
@@ -70,25 +70,6 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=0){
   ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
   ctx.closePath();
   ctx.fill();
-
-  // 🌊 微波高光
-  if(highlight > 0){
-    const grad = ctx.createLinearGradient(
-      sx - tileW/2, sy - tileH/2 - tileZ,
-      sx + tileW/2, sy - tileH/2 - tileZ
-    );
-    grad.addColorStop(0, `rgba(255,255,255,${0.25 * highlight})`);
-    grad.addColorStop(1, "rgba(255,255,255,0)");
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - tileZ);
-    ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
-    ctx.lineTo(sx, sy - tileH - tileZ);
-    ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
-    ctx.closePath();
-    ctx.fill();
-  }
 
   // 左
   ctx.fillStyle = colors.left;
@@ -112,11 +93,9 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=0){
 }
 
 function getWaterColor(z, maxDepth){
-
   const depthRatio = (maxDepth - z) / maxDepth;
 
   const baseHue = 205;
-
   const lightness = 72 - depthRatio * 45;
   const saturation = 75 - depthRatio * 30;
 
@@ -129,7 +108,7 @@ function getWaterColor(z, maxDepth){
 
 function render(){
 
-  time += 0.03;
+  time += 0.05;
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -180,25 +159,20 @@ function render(){
         right:"#2e7d32"
       });
     }else{
+
       const waterColor = getWaterColor(c.z, mapLayer);
 
-      let highlight = 0;
+      let waveOffset = 0;
 
-      // 🌊 表面微波
+      // 🌊 表面上下起伏
       if(c.z === mapLayer - 1){
-        highlight = 0.5 + 0.5 * Math.sin(time + c.x * 0.5 + c.y * 0.5);
+        const amplitude = tileZ * 0.18;
+        waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
       }
 
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, highlight);
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, waveOffset);
     }
   });
-
-  // 🌫 全域水體淡霧
-  const fog = ctx.createLinearGradient(0,0,0,canvas.height);
-  fog.addColorStop(0, "rgba(0,80,120,0.03)");
-  fog.addColorStop(1, "rgba(0,20,40,0.15)");
-  ctx.fillStyle = fog;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
 
   requestAnimationFrame(render);
 }
