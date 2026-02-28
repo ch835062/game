@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>最上層地圖 + 頂部預留10層</title>
+<title>半透明水立方體世界</title>
 <style>
 body{
   margin:0;
@@ -38,13 +38,12 @@ const topMap = [
   [1,1,1,0,0,1,1,1],
   [1,1,0,0,0,0,1,1],
   [1,0,0,0,0,0,0,1],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
 ];
 
-// ===== 等角轉換 =====
 function isoToScreen(x, y, z, tileW, tileH, tileZ){
   return {
     x: (x - y) * tileW / 2,
@@ -52,7 +51,7 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors,alpha=1){
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
 
@@ -61,6 +60,8 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
 
   const sx = pos.x + centerX;
   const sy = pos.y + centerY;
+
+  ctx.globalAlpha = alpha;
 
   // 上
   ctx.fillStyle = colors.top;
@@ -91,6 +92,8 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
   ctx.lineTo(sx, sy - tileZ);
   ctx.closePath();
   ctx.fill();
+
+  ctx.globalAlpha = 1;
 }
 
 function render(){
@@ -100,12 +103,8 @@ function render(){
   const tileH = tileW/2;
   const tileZ = tileW/2;
 
-  const reservedTopLayers = 20; // 🔥 頂部預留10層
-
-  // 自動算出需要多少層到畫面底部
+  const reservedTopLayers = 10;
   const totalLayers = Math.ceil(canvas.height / tileZ);
-
-  // 地圖所在層（最上層）
   const mapLayer = totalLayers - reservedTopLayers - 1;
 
   let cubes = [];
@@ -117,13 +116,13 @@ function render(){
         let type = null;
 
         if(z === mapLayer){
-          type = topMap[y][x]; // 原本地圖在最上層
+          type = topMap[y][x];
         }
         else if(z < mapLayer){
-          type = 0; // 地圖下方全水
+          type = 0; // 水
         }
         else{
-          continue; // 上方預留空氣
+          continue; // 空氣
         }
 
         cubes.push({
@@ -145,13 +144,14 @@ function render(){
         top:"#4caf50",
         left:"#388e3c",
         right:"#2e7d32"
-      });
+      },1);
     }else{
+      // 🔥 半透明水
       drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
         top:"#2196f3",
         left:"#1976d2",
         right:"#1565c0"
-      });
+      },0.55);
     }
   });
 
