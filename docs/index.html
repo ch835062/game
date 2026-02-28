@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>展示模型級水體立方體</title>
+<title>模型級水體 + 霧化 + 高光</title>
 <style>
 body{
   margin:0;
-  background:#111;
+  background:#0d1117;
   overflow:hidden;
 }
 canvas{
@@ -50,7 +50,7 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors, highlight=false){
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
   const centerX = canvas.width/2;
@@ -68,6 +68,25 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
   ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
   ctx.closePath();
   ctx.fill();
+
+  // 💎 高光
+  if(highlight){
+    const grad = ctx.createLinearGradient(
+      sx - tileW/2, sy - tileH/2 - tileZ,
+      sx + tileW/2, sy - tileH/2 - tileZ
+    );
+    grad.addColorStop(0, "rgba(255,255,255,0.35)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - tileZ);
+    ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
+    ctx.lineTo(sx, sy - tileH - tileZ);
+    ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // 左
   ctx.fillStyle = colors.left;
@@ -92,15 +111,17 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors){
 
 function getWaterColor(z, maxDepth){
 
-  const depthRatio = z / maxDepth;
+  const depthRatio = (maxDepth - z) / maxDepth;
 
-  const lightness = 70 - depthRatio * 40; 
   const baseHue = 205;
 
+  const lightness = 72 - depthRatio * 42;
+  const saturation = 75 - depthRatio * 25;
+
   return {
-    top: `hsl(${baseHue}, 70%, ${lightness}%)`,
-    left: `hsl(${baseHue}, 70%, ${lightness - 8}%)`,
-    right: `hsl(${baseHue}, 70%, ${lightness - 15}%)`
+    top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
+    left: `hsl(${baseHue}, ${saturation}%, ${lightness - 10}%)`,
+    right: `hsl(${baseHue}, ${saturation}%, ${lightness - 18}%)`
   };
 }
 
@@ -155,7 +176,8 @@ function render(){
       });
     }else{
       const waterColor = getWaterColor(c.z, mapLayer);
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor);
+      const isSurface = (c.z === mapLayer - 1);
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, isSurface);
     }
   });
 
