@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>15層空氣 + 半透明水立方體</title>
+<title>展示模型級水體立方體</title>
 <style>
 body{
   margin:0;
@@ -29,7 +29,6 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-// ===== 地圖 =====
 const mapRows = 8;
 const mapCols = 8;
 
@@ -51,17 +50,14 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors,alpha=1){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors){
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
-
   const centerX = canvas.width/2;
   const centerY = canvas.height * 0.6;
 
   const sx = pos.x + centerX;
   const sy = pos.y + centerY;
-
-  ctx.globalAlpha = alpha;
 
   // 上
   ctx.fillStyle = colors.top;
@@ -92,8 +88,20 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,alpha=1){
   ctx.lineTo(sx, sy - tileZ);
   ctx.closePath();
   ctx.fill();
+}
 
-  ctx.globalAlpha = 1;
+function getWaterColor(z, maxDepth){
+
+  const depthRatio = z / maxDepth;
+
+  const lightness = 70 - depthRatio * 40; 
+  const baseHue = 205;
+
+  return {
+    top: `hsl(${baseHue}, 70%, ${lightness}%)`,
+    left: `hsl(${baseHue}, 70%, ${lightness - 8}%)`,
+    right: `hsl(${baseHue}, 70%, ${lightness - 15}%)`
+  };
 }
 
 function render(){
@@ -103,7 +111,7 @@ function render(){
   const tileH = tileW/2;
   const tileZ = tileW/2;
 
-  const reservedTopLayers = 15; // 🔥 改為15層空氣
+  const reservedTopLayers = 15;
   const totalLayers = Math.ceil(canvas.height / tileZ);
   const mapLayer = totalLayers - reservedTopLayers - 1;
 
@@ -119,10 +127,10 @@ function render(){
           type = topMap[y][x];
         }
         else if(z < mapLayer){
-          type = 0; // 水
+          type = 0;
         }
         else{
-          continue; // 空氣
+          continue;
         }
 
         cubes.push({
@@ -144,13 +152,10 @@ function render(){
         top:"#4caf50",
         left:"#388e3c",
         right:"#2e7d32"
-      },1);
+      });
     }else{
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#2196f3",
-        left:"#1976d2",
-        right:"#1565c0"
-      },0.55);
+      const waterColor = getWaterColor(c.z, mapLayer);
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor);
     }
   });
 
