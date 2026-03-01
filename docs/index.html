@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水立方體強化完整版</title>
+<title>水深透明強化版 + 微氣泡</title>
 <style>
 body{
   margin:0;
@@ -40,10 +40,10 @@ const topMap = [
   [1,1,1,0,0,1,1,1],
   [1,1,0,0,0,0,1,1],
   [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,0],
-  [1,0,0,0,0,0,0,0],
-  [1,0,0,0,0,0,0,0],
-  [1,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0],
 ];
 
 let time = 0;
@@ -55,7 +55,7 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
   };
 }
 
-function drawCubeShell(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
+function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
 
   ctx.globalAlpha = alpha;
 
@@ -65,6 +65,16 @@ function drawCubeShell(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
 
   const sx = pos.x + centerX;
   const sy = pos.y + centerY - heightOffset;
+
+  // 上面
+  ctx.fillStyle = colors.top;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx, sy - tileH - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.closePath();
+  ctx.fill();
 
   // 左面
   ctx.fillStyle = colors.left;
@@ -90,14 +100,18 @@ function drawCubeShell(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
 }
 
 function getWaterVisual(z, maxDepth){
+
   const depthRatio = (maxDepth - z) / maxDepth;
+
   const baseHue = 205;
   const lightness = 72 - depthRatio * 45;
   const saturation = 75 - depthRatio * 30;
+
   const alpha = 0.85 - depthRatio * 0.55;
 
   return {
     colors:{
+      top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
       left:`hsl(${baseHue}, ${saturation}%, ${lightness - 12}%)`,
       right:`hsl(${baseHue}, ${saturation}%, ${lightness - 20}%)`
     },
@@ -105,12 +119,12 @@ function getWaterVisual(z, maxDepth){
   };
 }
 
-/* ========================
-   微氣泡系統
-======================== */
+/* =========================
+   微氣泡粒子系統
+========================= */
 
 const bubbles = [];
-const bubbleCount = 180;
+const bubbleCount = 160;
 
 function createBubbles(mapLayer){
   bubbles.length = 0;
@@ -130,6 +144,7 @@ function updateBubbles(mapLayer){
   bubbles.forEach(b=>{
     b.z += b.speed;
     b.x += Math.sin(time*0.5 + b.z)*b.drift;
+
     if(b.z >= mapLayer){
       b.z = 0;
       b.x = Math.random()*mapCols;
@@ -139,10 +154,12 @@ function updateBubbles(mapLayer){
 }
 
 function drawBubbles(tileW,tileH,tileZ,mapLayer){
+
   ctx.save();
   ctx.globalCompositeOperation="lighter";
 
   bubbles.forEach(b=>{
+
     const pos = isoToScreen(b.x,b.y,b.z,tileW,tileH,tileZ);
     const centerX = canvas.width/2;
     const centerY = canvas.height * 0.6;
@@ -150,9 +167,8 @@ function drawBubbles(tileW,tileH,tileZ,mapLayer){
     const sx = pos.x + centerX;
     const sy = pos.y + centerY;
 
-    const depthRatio = b.z/mapLayer;
-
-    ctx.globalAlpha = 0.15 + (1-depthRatio)*0.25;
+    const depthRatio = b.z / mapLayer;
+    ctx.globalAlpha = 0.15 + (1-depthRatio)*0.3;
 
     ctx.beginPath();
     ctx.arc(sx, sy - tileZ/2, b.size, 0, Math.PI*2);
@@ -166,6 +182,7 @@ function drawBubbles(tileW,tileH,tileZ,mapLayer){
 function render(){
 
   time += 0.05;
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const tileW = Math.min(canvas.width, canvas.height)/8;
@@ -180,45 +197,55 @@ function render(){
     createBubbles(mapLayer);
   }
 
-  for(let z=0; z<=mapLayer; z++){
+  let cubes = [];
+
+  for(let z=0; z<totalLayers; z++){
     for(let y=0; y<mapRows; y++){
       for(let x=0; x<mapCols; x++){
 
-        if(z === mapLayer && topMap[y][x]===1){
-          continue; // 地圖層不畫水
+        let type = null;
+
+        if(z === mapLayer){
+          type = topMap[y][x];
         }
-
-        const water = getWaterVisual(z,mapLayer);
-
-        let waveOffset = 0;
-        if(z===mapLayer){
-          const amplitude = tileZ*0.18;
-          waveOffset = Math.sin(time + x*0.6 + y*0.6)*amplitude;
+        else if(z < mapLayer){
+          type = 0;
         }
+        else continue;
 
-        let edgeBoost=0;
-        let edgeAlphaBoost=0;
-
-        if(x===0 || x===mapCols-1){
-          edgeBoost=8;
-          edgeAlphaBoost=0.12;
-        }
-
-        const boostedColors={
-          left:`hsl(205,80%,${60+edgeBoost}%)`,
-          right:`hsl(205,80%,${55+edgeBoost}%)`
-        };
-
-        drawCubeShell(
-          x,y,z,
-          tileW,tileH,tileZ,
-          boostedColors,
-          waveOffset,
-          water.alpha+edgeAlphaBoost
-        );
+        cubes.push({ x,y,z,type, depth: x+y+z });
       }
     }
   }
+
+  cubes.sort((a,b)=>a.depth-b.depth);
+
+  cubes.forEach(c=>{
+    if(c.type === 1){
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#4caf50",
+        left:"#388e3c",
+        right:"#2e7d32"
+      });
+    }else{
+
+      const water = getWaterVisual(c.z, mapLayer);
+
+      let waveOffset = 0;
+      if(c.z === mapLayer){
+        const amplitude = tileZ * 0.18;
+        waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
+      }
+
+      drawCube(
+        c.x,c.y,c.z,
+        tileW,tileH,tileZ,
+        water.colors,
+        waveOffset,
+        water.alpha
+      );
+    }
+  });
 
   updateBubbles(mapLayer);
   drawBubbles(tileW,tileH,tileZ,mapLayer);
