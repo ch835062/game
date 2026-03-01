@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水底地層版</title>
+<title>水族箱最終強化版</title>
 <style>
 body{
   margin:0;
@@ -120,6 +120,38 @@ function getWaterVisual(z, maxDepth, y){
   };
 }
 
+// 🌑 海床高度函數（斜坡＋起伏）
+function getSeabedHeight(x,y){
+  const slope = y * 0.3; // 斜坡
+  const wave = Math.sin(x*0.8) * 0.8 + Math.cos(y*0.6) * 0.5;
+  return Math.floor(slope + wave);
+}
+
+// 🌿 海草
+function drawSeaweed(x,y,z,tileW,tileH,tileZ){
+
+  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
+  const centerX = canvas.width/2;
+  const centerY = canvas.height * 0.6;
+
+  const sx = pos.x + centerX;
+  const sy = pos.y + centerY;
+
+  const sway = Math.sin(time*2 + x) * 5;
+
+  ctx.strokeStyle = "rgba(20,120,60,0.8)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - tileZ/2);
+  ctx.quadraticCurveTo(
+    sx + sway,
+    sy - tileZ - 20,
+    sx + sway,
+    sy - tileZ - 40
+  );
+  ctx.stroke();
+}
+
 function render(){
 
   time += 0.05;
@@ -135,25 +167,45 @@ function render(){
 
   let cubes = [];
 
-  for(let z=0; z<totalLayers; z++){
-    for(let y=0; y<mapRows; y++){
-      for(let x=0; x<mapCols; x++){
+  for(let y=0; y<mapRows; y++){
+    for(let x=0; x<mapCols; x++){
 
-        let type = null;
+      const seabedHeight = getSeabedHeight(x,y);
 
-        if(z === 0){
-          type = 2; // 🌑 水底層
-        }
-        else if(z === mapLayer){
-          type = topMap[y][x];
-        }
-        else if(z < mapLayer){
-          type = 0; // 水
-        }
-        else continue;
+      // 🌑 海床
+      cubes.push({
+        x,y,
+        z: seabedHeight,
+        type:"seabed",
+        depth: x+y+seabedHeight
+      });
 
-        cubes.push({ x,y,z,type, depth: x+y+z });
+      // 🌿 海草
+      if(Math.random() < 0.15){
+        cubes.push({
+          x,y,
+          z: seabedHeight+1,
+          type:"seaweed",
+          depth: x+y+seabedHeight+1
+        });
       }
+
+      // 🌊 水
+      for(let z=seabedHeight+1; z<mapLayer; z++){
+        cubes.push({
+          x,y,z,
+          type:"water",
+          depth: x+y+z
+        });
+      }
+
+      // 🟩 地圖
+      cubes.push({
+        x,y,
+        z:mapLayer,
+        type: topMap[y][x] ? "land":"water",
+        depth:x+y+mapLayer
+      });
     }
   }
 
@@ -161,17 +213,20 @@ function render(){
 
   cubes.forEach(c=>{
 
-    // 🌑 水底
-    if(c.type === 2){
+    if(c.type==="seabed"){
+      const grain = 30 + Math.random()*20;
       drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#3b2a1d",
-        left:"#2c1f15",
-        right:"#1f150f"
-      },0,1);
+        top:`hsl(30,40%,${grain}%)`,
+        left:`hsl(30,35%,${grain-10}%)`,
+        right:`hsl(30,35%,${grain-18}%)`
+      });
     }
 
-    // 🟩 地面
-    else if(c.type === 1){
+    else if(c.type==="seaweed"){
+      drawSeaweed(c.x,c.y,c.z,tileW,tileH,tileZ);
+    }
+
+    else if(c.type==="land"){
       drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
         top:"#4caf50",
         left:"#388e3c",
@@ -179,12 +234,11 @@ function render(){
       });
     }
 
-    // 🌊 水
     else{
-      const water = getWaterVisual(c.z, mapLayer, c.y);
+      const water = getWaterVisual(c.z,mapLayer,c.y);
 
       let waveOffset = 0;
-      if(c.z === mapLayer){
+      if(c.z===mapLayer){
         const amplitude = tileZ * 0.18;
         waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
       }
