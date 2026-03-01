@@ -102,7 +102,7 @@ function animate(){
   time += 0.03;
 
   cubes.forEach(obj=>{
-    if(obj.z === mapLayer-1){
+    if(obj.z === mapLayer){
       const x = obj.mesh.position.x;
       const y = obj.mesh.position.z;
       obj.mesh.position.y =
