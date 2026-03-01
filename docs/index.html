@@ -2,9 +2,10 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>外殼水體 + 頂層波浪</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小立方體堆疊大立方體</title>
 <style>
-body{margin:0;background:#0b0f14;overflow:hidden;}
+body{margin:0;background:#111;overflow:hidden;}
 canvas{display:block;}
 </style>
 </head>
@@ -12,133 +13,133 @@ canvas{display:block;}
 <canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
 }
-window.addEventListener("resize", resize);
+window.addEventListener("resize",resize);
 resize();
 
-const size = 8;
-const depthLayers = 25;
-const reservedTop = 15;
-const mapLayer = depthLayers - reservedTop - 1;
-
-let time = 0;
-
-function isoToScreen(x, y, z, tileW, tileH, tileZ){
-  return {
-    x: (x - y) * tileW / 2,
-    y: (x + y) * tileH / 2 - z * tileZ
-  };
+function iso(x,y,z,tileW,tileH,tileZ){
+  return{
+    x:(x-y)*tileW/2,
+    y:(x+y)*tileH/2 - z*tileZ
+  }
 }
 
-function drawFace(points, color, alpha=1){
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
+const size=6;      // X,Y 寬度
+const height=4;    // Z 高度
+
+let time=0;
+
+function drawCube(x,y,z,tileW,tileH,tileZ,color){
+
+  const p=iso(x,y,z,tileW,tileH,tileZ);
+  const cx=canvas.width/2;
+  const cy=canvas.height/3;
+
+  const sx=p.x+cx;
+  const sy=p.y+cy;
+
+  // 上
+  ctx.fillStyle=color.top;
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for(let i=1;i<points.length;i++){
-    ctx.lineTo(points[i].x, points[i].y);
-  }
+  ctx.moveTo(sx,sy);
+  ctx.lineTo(sx+tileW/2,sy-tileH/2);
+  ctx.lineTo(sx,sy-tileH);
+  ctx.lineTo(sx-tileW/2,sy-tileH/2);
   ctx.closePath();
   ctx.fill();
-  ctx.globalAlpha = 1;
+
+  // 左
+  ctx.fillStyle=color.left;
+  ctx.beginPath();
+  ctx.moveTo(sx-tileW/2,sy-tileH/2);
+  ctx.lineTo(sx-tileW/2,sy-tileH/2+tileZ);
+  ctx.lineTo(sx,sy+tileZ);
+  ctx.lineTo(sx,sy);
+  ctx.closePath();
+  ctx.fill();
+
+  // 右
+  ctx.fillStyle=color.right;
+  ctx.beginPath();
+  ctx.moveTo(sx+tileW/2,sy-tileH/2);
+  ctx.lineTo(sx+tileW/2,sy-tileH/2+tileZ);
+  ctx.lineTo(sx,sy+tileZ);
+  ctx.lineTo(sx,sy);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function render(){
-  time += 0.05;
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const tileW = Math.min(canvas.width,canvas.height)/8;
-  const tileH = tileW/2;
-  const tileZ = tileW/2;
+  const tileW=Math.min(canvas.width,canvas.height)/12;
+  const tileH=tileW/2;
+  const tileZ=tileW/2;
 
-  const centerX = canvas.width/2;
-  const centerY = canvas.height*0.65;
+  let cubes=[];
 
-  // ===== 畫水外殼 =====
-  for(let z=0; z<=mapLayer; z++){
+  for(let x=0;x<size;x++){
+    for(let y=0;y<size;y++){
+      for(let z=0;z<height;z++){
 
-    const depthRatio = (mapLayer - z)/mapLayer;
-    const alpha = 0.9 - depthRatio*0.6;
-
-    const light = 70 - depthRatio*45;
-    const baseColor = `hsl(205,70%,${light}%)`;
-
-    // 左側面 (x=0)
-    for(let y=0; y<size; y++){
-      const p = isoToScreen(0,y,z,tileW,tileH,tileZ);
-      const sx = p.x+centerX;
-      const sy = p.y+centerY;
-
-      drawFace([
-        {x:sx-tileW/2,y:sy-tileH/2-tileZ},
-        {x:sx-tileW/2,y:sy-tileH/2},
-        {x:sx,y:sy},
-        {x:sx,y:sy-tileZ}
-      ], baseColor, alpha);
-    }
-
-    // 右側面 (y=0)
-    for(let x=0; x<size; x++){
-      const p = isoToScreen(x,0,z,tileW,tileH,tileZ);
-      const sx = p.x+centerX;
-      const sy = p.y+centerY;
-
-      drawFace([
-        {x:sx+tileW/2,y:sy-tileH/2-tileZ},
-        {x:sx+tileW/2,y:sy-tileH/2},
-        {x:sx,y:sy},
-        {x:sx,y:sy-tileZ}
-      ], baseColor, alpha);
-    }
-
-    // 底面 (z=0)
-    if(z===0){
-      for(let x=0;x<size;x++){
-        for(let y=0;y<size;y++){
-          const p = isoToScreen(x,y,0,tileW,tileH,tileZ);
-          const sx = p.x+centerX;
-          const sy = p.y+centerY;
-
-          drawFace([
-            {x:sx,y:sy},
-            {x:sx+tileW/2,y:sy-tileH/2},
-            {x:sx,y:sy-tileH},
-            {x:sx-tileW/2,y:sy-tileH/2}
-          ], baseColor, alpha);
+        // 中央挖空形成水池
+        if(
+          x>=2&&x<=3 &&
+          y>=2&&y<=3 &&
+          z>=2
+        ){
+          continue;
         }
+
+        cubes.push({x,y,z});
       }
     }
   }
 
-  // ===== 畫最頂層水面（含波浪）=====
-  for(let x=0;x<size;x++){
-    for(let y=0;y<size;y++){
+  // 深度排序
+  cubes.sort((a,b)=>{
+    return (a.x+a.y+a.z)-(b.x+b.y+b.z);
+  });
 
-      const wave =
-        Math.sin(time + x*0.6 + y*0.6) * tileZ*0.2;
+  cubes.forEach(c=>{
 
-      const p = isoToScreen(x,y,mapLayer,tileW,tileH,tileZ);
-      const sx = p.x+centerX;
-      const sy = p.y+centerY - wave;
+    let color={
+      top:"#4caf50",
+      left:"#388e3c",
+      right:"#2e7d32"
+    };
 
-      const light = 75;
-      const color = `hsl(205,75%,${light}%)`;
+    // 底部中央區改為水
+    if(
+      c.x>=2&&c.x<=3 &&
+      c.y>=2&&c.y<=3 &&
+      c.z<2
+    ){
+      const wave=Math.sin(time+c.x+c.y)*3;
 
-      drawFace([
-        {x:sx,y:sy-tileZ},
-        {x:sx+tileW/2,y:sy-tileH/2-tileZ},
-        {x:sx,y:sy-tileH-tileZ},
-        {x:sx-tileW/2,y:sy-tileH/2-tileZ}
-      ], color, 0.95);
+      drawCube(
+        c.x,c.y,c.z,
+        tileW,tileH,tileZ,
+        {
+          top:"#4fc3f7",
+          left:"rgba(21,101,192,0.85)",
+          right:"rgba(13,71,161,0.9)"
+        }
+      );
+      return;
     }
-  }
 
+    drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,color);
+
+  });
+
+  time+=0.05;
   requestAnimationFrame(render);
 }
 
