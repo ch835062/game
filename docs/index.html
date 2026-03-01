@@ -3,16 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水深透明強化版 + 微氣泡</title>
+<title>極簡水族箱模型展示版</title>
 <style>
 body{
   margin:0;
-  background: linear-gradient(
-    to bottom,
-    hsl(205,60%,35%) 0%,
-    hsl(205,50%,20%) 40%,
-    hsl(205,45%,12%) 100%
-  );
+  background:#eef2f5;
   overflow:hidden;
 }
 canvas{ display:block; }
@@ -35,17 +30,6 @@ resize();
 const mapRows = 8;
 const mapCols = 8;
 
-const topMap = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0],
-];
-
 let time = 0;
 
 function isoToScreen(x, y, z, tileW, tileH, tileZ){
@@ -56,12 +40,11 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
 }
 
 function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
-
   ctx.globalAlpha = alpha;
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
   const centerX = canvas.width/2;
-  const centerY = canvas.height * 0.6;
+  const centerY = canvas.height * 0.58;
 
   const sx = pos.x + centerX;
   const sy = pos.y + centerY - heightOffset;
@@ -100,31 +83,29 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
 }
 
 function getWaterVisual(z, maxDepth){
-
   const depthRatio = (maxDepth - z) / maxDepth;
 
-  const baseHue = 205;
-  const lightness = 72 - depthRatio * 45;
-  const saturation = 75 - depthRatio * 30;
-
-  const alpha = 0.85 - depthRatio * 0.55;
+  const baseHue = 200;
+  const lightness = 80 - depthRatio * 35;
+  const saturation = 50 - depthRatio * 20;
+  const alpha = 0.65 - depthRatio * 0.35;
 
   return {
     colors:{
       top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
-      left:`hsl(${baseHue}, ${saturation}%, ${lightness - 12}%)`,
-      right:`hsl(${baseHue}, ${saturation}%, ${lightness - 20}%)`
+      left:`hsl(${baseHue}, ${saturation}%, ${lightness - 10}%)`,
+      right:`hsl(${baseHue}, ${saturation}%, ${lightness - 18}%)`
     },
     alpha: alpha
   };
 }
 
 /* =========================
-   微氣泡粒子系統
+   微氣泡（柔和版）
 ========================= */
 
 const bubbles = [];
-const bubbleCount = 160;
+const bubbleCount = 100;
 
 function createBubbles(mapLayer){
   bubbles.length = 0;
@@ -133,9 +114,9 @@ function createBubbles(mapLayer){
       x: Math.random()*mapCols,
       y: Math.random()*mapRows,
       z: Math.random()*mapLayer,
-      speed: 0.01 + Math.random()*0.03,
-      size: 1 + Math.random()*2,
-      drift: Math.random()*0.02
+      speed: 0.008 + Math.random()*0.02,
+      size: 0.8 + Math.random()*1.5,
+      drift: Math.random()*0.015
     });
   }
 }
@@ -143,8 +124,7 @@ function createBubbles(mapLayer){
 function updateBubbles(mapLayer){
   bubbles.forEach(b=>{
     b.z += b.speed;
-    b.x += Math.sin(time*0.5 + b.z)*b.drift;
-
+    b.x += Math.sin(time*0.4 + b.z)*b.drift;
     if(b.z >= mapLayer){
       b.z = 0;
       b.x = Math.random()*mapCols;
@@ -154,42 +134,54 @@ function updateBubbles(mapLayer){
 }
 
 function drawBubbles(tileW,tileH,tileZ,mapLayer){
-
-  ctx.save();
-  ctx.globalCompositeOperation="lighter";
-
   bubbles.forEach(b=>{
-
     const pos = isoToScreen(b.x,b.y,b.z,tileW,tileH,tileZ);
     const centerX = canvas.width/2;
-    const centerY = canvas.height * 0.6;
+    const centerY = canvas.height * 0.58;
 
     const sx = pos.x + centerX;
     const sy = pos.y + centerY;
 
-    const depthRatio = b.z / mapLayer;
-    ctx.globalAlpha = 0.15 + (1-depthRatio)*0.3;
+    const depthRatio = b.z/mapLayer;
+    ctx.globalAlpha = 0.1 + (1-depthRatio)*0.2;
 
     ctx.beginPath();
     ctx.arc(sx, sy - tileZ/2, b.size, 0, Math.PI*2);
-    ctx.fillStyle="rgba(255,255,255,0.8)";
+    ctx.fillStyle="rgba(255,255,255,0.7)";
     ctx.fill();
   });
+  ctx.globalAlpha = 1;
+}
 
-  ctx.restore();
+/* ========================= */
+
+function drawGlassFrame(tileW,mapLayer,tileZ){
+  ctx.strokeStyle="rgba(255,255,255,0.7)";
+  ctx.lineWidth=2;
+
+  const width = tileW*mapCols/2;
+  const height = tileZ*(mapLayer+1);
+
+  const cx = canvas.width/2;
+  const cy = canvas.height*0.58;
+
+  ctx.strokeRect(cx-width, cy-height, width*2, height);
+
+  // 底座
+  ctx.fillStyle="#222";
+  ctx.fillRect(cx-width-40, cy+10, width*2+80, 20);
 }
 
 function render(){
 
-  time += 0.05;
-
+  time += 0.03;
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const tileW = Math.min(canvas.width, canvas.height)/8;
   const tileH = tileW/2;
   const tileZ = tileW/2;
 
-  const reservedTopLayers = 15;
+  const reservedTopLayers = 12;
   const totalLayers = Math.ceil(canvas.height / tileZ);
   const mapLayer = totalLayers - reservedTopLayers - 1;
 
@@ -197,58 +189,32 @@ function render(){
     createBubbles(mapLayer);
   }
 
-  let cubes = [];
-
-  for(let z=0; z<totalLayers; z++){
+  for(let z=0; z<=mapLayer; z++){
     for(let y=0; y<mapRows; y++){
       for(let x=0; x<mapCols; x++){
 
-        let type = null;
+        const water = getWaterVisual(z,mapLayer);
 
-        if(z === mapLayer){
-          type = topMap[y][x];
+        let waveOffset = 0;
+        if(z===mapLayer){
+          waveOffset = Math.sin(time + x*0.5 + y*0.5)* (tileZ*0.05);
         }
-        else if(z < mapLayer){
-          type = 0;
-        }
-        else continue;
 
-        cubes.push({ x,y,z,type, depth: x+y+z });
+        drawCube(
+          x,y,z,
+          tileW,tileH,tileZ,
+          water.colors,
+          waveOffset,
+          water.alpha
+        );
       }
     }
   }
 
-  cubes.sort((a,b)=>a.depth-b.depth);
-
-  cubes.forEach(c=>{
-    if(c.type === 1){
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#4caf50",
-        left:"#388e3c",
-        right:"#2e7d32"
-      });
-    }else{
-
-      const water = getWaterVisual(c.z, mapLayer);
-
-      let waveOffset = 0;
-      if(c.z === mapLayer){
-        const amplitude = tileZ * 0.18;
-        waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
-      }
-
-      drawCube(
-        c.x,c.y,c.z,
-        tileW,tileH,tileZ,
-        water.colors,
-        waveOffset,
-        water.alpha
-      );
-    }
-  });
-
   updateBubbles(mapLayer);
   drawBubbles(tileW,tileH,tileZ,mapLayer);
+
+  drawGlassFrame(tileW,mapLayer,tileZ);
 
   requestAnimationFrame(render);
 }
