@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水立方體強化邊框完整版</title>
+<title>水深透明強化版 + 微氣泡</title>
 <style>
 body{
   margin:0;
@@ -56,6 +56,7 @@ function isoToScreen(x, y, z, tileW, tileH, tileZ){
 }
 
 function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
+
   ctx.globalAlpha = alpha;
 
   const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
@@ -65,6 +66,7 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
   const sx = pos.x + centerX;
   const sy = pos.y + centerY - heightOffset;
 
+  // 上面
   ctx.fillStyle = colors.top;
   ctx.beginPath();
   ctx.moveTo(sx, sy - tileZ);
@@ -74,6 +76,7 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
   ctx.closePath();
   ctx.fill();
 
+  // 左面
   ctx.fillStyle = colors.left;
   ctx.beginPath();
   ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
@@ -83,6 +86,7 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
   ctx.closePath();
   ctx.fill();
 
+  // 右面
   ctx.fillStyle = colors.right;
   ctx.beginPath();
   ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
@@ -95,12 +99,20 @@ function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
   ctx.globalAlpha = 1;
 }
 
-function getWaterVisual(z, maxDepth){
+function getWaterVisual(z, maxDepth, y){
+
   const depthRatio = (maxDepth - z) / maxDepth;
+
   const baseHue = 205;
   const lightness = 72 - depthRatio * 45;
   const saturation = 75 - depthRatio * 30;
-  const alpha = 0.85 - depthRatio * 0.55;
+
+  // 🔥 新透明規則：依照 y (距離使用者遠近)
+  const distanceRatio = y / (mapRows - 1);
+
+  // 靠近使用者 (y大) → 更透明
+  // 遠處 (y小) → 更不透明
+  const alpha = 0.9 - distanceRatio * 0.6;
 
   return {
     colors:{
@@ -113,7 +125,7 @@ function getWaterVisual(z, maxDepth){
 }
 
 /* =========================
-   微氣泡
+   微氣泡粒子系統
 ========================= */
 
 const bubbles = [];
@@ -137,6 +149,7 @@ function updateBubbles(mapLayer){
   bubbles.forEach(b=>{
     b.z += b.speed;
     b.x += Math.sin(time*0.5 + b.z)*b.drift;
+
     if(b.z >= mapLayer){
       b.z = 0;
       b.x = Math.random()*mapCols;
@@ -146,10 +159,12 @@ function updateBubbles(mapLayer){
 }
 
 function drawBubbles(tileW,tileH,tileZ,mapLayer){
+
   ctx.save();
   ctx.globalCompositeOperation="lighter";
 
   bubbles.forEach(b=>{
+
     const pos = isoToScreen(b.x,b.y,b.z,tileW,tileH,tileZ);
     const centerX = canvas.width/2;
     const centerY = canvas.height * 0.6;
@@ -165,58 +180,6 @@ function drawBubbles(tileW,tileH,tileZ,mapLayer){
     ctx.fillStyle="rgba(255,255,255,0.8)";
     ctx.fill();
   });
-
-  ctx.restore();
-}
-
-/* =========================
-   強化外層水邊框
-========================= */
-
-function drawWaterEdgeShell(tileW, tileZ, mapLayer){
-
-  const centerX = canvas.width/2;
-  const centerY = canvas.height * 0.6;
-
-  const width = mapCols * tileW/2;
-  const height = (mapLayer+1) * tileZ;
-
-  const baseHue = 205;
-
-  ctx.save();
-
-  let gradientLeft = ctx.createLinearGradient(
-    centerX - width,
-    centerY - height,
-    centerX - width,
-    centerY
-  );
-
-  gradientLeft.addColorStop(0, `hsla(${baseHue},70%,65%,0.6)`);
-  gradientLeft.addColorStop(1, `hsla(${baseHue},60%,25%,0.4)`);
-
-  ctx.fillStyle = gradientLeft;
-  ctx.fillRect(centerX - width - 6, centerY - height, 6, height);
-
-  let gradientRight = ctx.createLinearGradient(
-    centerX + width,
-    centerY - height,
-    centerX + width,
-    centerY
-  );
-
-  gradientRight.addColorStop(0, `hsla(${baseHue},70%,65%,0.6)`);
-  gradientRight.addColorStop(1, `hsla(${baseHue},60%,25%,0.4)`);
-
-  ctx.fillStyle = gradientRight;
-  ctx.fillRect(centerX + width, centerY - height, 6, height);
-
-  ctx.strokeStyle = `hsla(${baseHue},80%,80%,0.4)`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(centerX - width, centerY - height);
-  ctx.lineTo(centerX + width, centerY - height);
-  ctx.stroke();
 
   ctx.restore();
 }
@@ -269,7 +232,8 @@ function render(){
         right:"#2e7d32"
       });
     }else{
-      const water = getWaterVisual(c.z, mapLayer);
+
+      const water = getWaterVisual(c.z, mapLayer, c.y);
 
       let waveOffset = 0;
       if(c.z === mapLayer){
@@ -289,8 +253,6 @@ function render(){
 
   updateBubbles(mapLayer);
   drawBubbles(tileW,tileH,tileZ,mapLayer);
-
-  drawWaterEdgeShell(tileW,tileZ,mapLayer);
 
   requestAnimationFrame(render);
 }
