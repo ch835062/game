@@ -170,7 +170,7 @@ function render(){
       let waveOffset = 0;
 
       // 🌊 表面上下起伏
-      if(c.z === mapLayer - 1){
+      if(c.z === mapLayer){
         const amplitude = tileZ * 0.18;
         waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
       }
