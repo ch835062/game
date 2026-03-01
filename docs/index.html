@@ -3,7 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>水面上下起伏流動</<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>水面上下起伏流動</title>
+<style>
+body{
+  margin:0;
+  background:#0b0f14;
+  overflow:hidden;
+}
+canvas{
+  display:block;
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+const mapRows = 8;
+const mapCols = 8;
+
+const topMap = [
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,0,0,0,0,1,1],
+  [1,0,0,0,0,0,0,1],
+  [1,1,0,0,0,0,1,1],
+  [1,1,1,0,0,1,1,1],
+  [1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1],
+];
+
+let time = 0;
+
+function isoToScreen(x, y, z, tileW, tileH, tileZ){
+  return {
+    x: (x - y) * tileW / 2,
+    y: (x + y) * tileH / 2 - z * tileZ
+  };
+}
+
+function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0){
+
+  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
+  const centerX = canvas.width/2;
+  const centerY = canvas.height * 0.6;
+
+  const sx = pos.x + centerX;
+  const sy = pos.y + centerY - heightOffset;
+
+  // 上
+  ctx.fillStyle = colors.top;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx, sy - tileH - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.closePath();
+  ctx.fill();
+
+  // 左
+  ctx.fillStyle = colors.left;
+  ctx.beginPath();
+  ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx - tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
+  ctx.closePath();
+  ctx.fill();
+
+  // 右
+  ctx.fillStyle = colors.right;
+  ctx.beginPath();
+  ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
+  ctx.lineTo(sx + tileW/2, sy - tileH/2);
+  ctx.lineTo(sx, sy);
+  ctx.lineTo(sx, sy - tileZ);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function getWaterColor(z, maxDepth){
+  const depthRatio = (maxDepth - z) / maxDepth;
+
+  const baseHue = 205;
+  const lightness = 72 - depthRatio * 45;
+  const saturation = 75 - depthRatio * 30;
+
+  return {
+    top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
+    left: `hsl(${baseHue}, ${saturation}%, ${lightness - 12}%)`,
+    right: `hsl(${baseHue}, ${saturation}%, ${lightness - 20}%)`
+  };
+}
+
+function render(){
+
+  time += 0.05;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const tileW = Math.min(canvas.width, canvas.height)/8;
+  const tileH = tileW/2;
+  const tileZ = tileW/2;
+
+  const reservedTopLayers = 15;
+  const totalLayers = Math.ceil(canvas.height / tileZ);
+  const mapLayer = totalLayers - reservedTopLayers - 1;
+
+  let cubes = [];
+
+  for(let z=0; z<totalLayers; z++){
+    for(let y=0; y<mapRows; y++){
+      for(let x=0; x<mapCols; x++){
+
+        let type = null;
+
+        if(z === mapLayer){
+          type = topMap[y][x];
+        }
+        else if(z < mapLayer){
+          type = 0;
+        }
+        else{
+          continue;
+        }
+
+        cubes.push({
+          x,
+          y,
+          z,
+          type,
+          depth: x + y + z
+        });
+      }
+    }
+  }
+
+  cubes.sort((a,b)=>a.depth-b.depth);
+
+  cubes.forEach(c=>{
+    if(c.type === 1){
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
+        top:"#4caf50",
+        left:"#388e3c",
+        right:"#2e7d32"
+      });
+    }else{
+
+      const waterColor = getWaterColor(c.z, mapLayer);
+
+      let waveOffset = 0;
+
+      // 🌊 表面上下起伏
+      if(c.z === mapLayer - 1){
+        const amplitude = tileZ * 0.18;
+        waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
+      }
+
+      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ, waterColor, waveOffset);
+    }
+  });
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>>
 <style>
 body{
   margin:0;
