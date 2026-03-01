@@ -2,187 +2,120 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水深透明強化版</title>
+<title>WebGL 真3D水體</title>
 <style>
-body{
-  margin:0;
-  background:#0b0f14;
-  overflow:hidden;
-}
-canvas{ display:block; }
+body{margin:0;overflow:hidden;background:#0b0f14;}
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0f14);
 
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth/window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(20,25,20);
+camera.lookAt(0,0,0);
 
-const mapRows = 8;
-const mapCols = 8;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-const topMap = [
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,0,0,0,0,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,0,0,0,0,1,1],
-  [1,1,1,0,0,1,1,1],
-  [1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1],
-];
+window.addEventListener("resize", ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-let time = 0;
+// ===== 光源 =====
+const light = new THREE.DirectionalLight(0xffffff,1.2);
+light.position.set(10,20,10);
+light.castShadow = true;
+scene.add(light);
 
-function isoToScreen(x, y, z, tileW, tileH, tileZ){
-  return {
-    x: (x - y) * tileW / 2,
-    y: (x + y) * tileH / 2 - z * tileZ
-  };
-}
+scene.add(new THREE.AmbientLight(0x404040,0.6));
 
-function drawCube(x,y,z,tileW,tileH,tileZ,colors,heightOffset=0,alpha=1){
+// ===== 地圖 =====
+const size = 8;
+const depthLayers = 20;
+const reservedTop = 15;
+const mapLayer = depthLayers - reservedTop - 1;
 
-  ctx.globalAlpha = alpha;
+const geometry = new THREE.BoxGeometry(1,1,1);
 
-  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
-  const centerX = canvas.width/2;
-  const centerY = canvas.height * 0.6;
+const landMaterial = new THREE.MeshStandardMaterial({
+  color:0x4caf50
+});
 
-  const sx = pos.x + centerX;
-  const sy = pos.y + centerY - heightOffset;
-
-  ctx.fillStyle = colors.top;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - tileZ);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx, sy - tileH - tileZ);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2 - tileZ);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = colors.left;
-  ctx.beginPath();
-  ctx.moveTo(sx - tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx - tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - tileZ);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = colors.right;
-  ctx.beginPath();
-  ctx.moveTo(sx + tileW/2, sy - tileH/2 - tileZ);
-  ctx.lineTo(sx + tileW/2, sy - tileH/2);
-  ctx.lineTo(sx, sy);
-  ctx.lineTo(sx, sy - tileZ);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.globalAlpha = 1;
+function getWaterMaterial(depthRatio){
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(`hsl(205,70%,${60 - depthRatio*40}%)`),
+    transparent:true,
+    opacity:0.9 - depthRatio*0.6,
+    roughness:0.3,
+    metalness:0.1
+  });
 }
 
-function getWaterVisual(z, maxDepth){
+// ===== 建立世界 =====
+const cubes = [];
 
-  const depthRatio = (maxDepth - z) / maxDepth;
+for(let z=0; z<depthLayers; z++){
+  for(let x=0; x<size; x++){
+    for(let y=0; y<size; y++){
 
-  const baseHue = 205;
-  const lightness = 72 - depthRatio * 45;
-  const saturation = 75 - depthRatio * 30;
+      if(z > mapLayer) continue;
 
-  const alpha = 0.85 - depthRatio * 0.55;
+      let material;
 
-  return {
-    colors:{
-      top: `hsl(${baseHue}, ${saturation}%, ${lightness}%)`,
-      left:`hsl(${baseHue}, ${saturation}%, ${lightness - 12}%)`,
-      right:`hsl(${baseHue}, ${saturation}%, ${lightness - 20}%)`
-    },
-    alpha: alpha
-  };
-}
-
-function render(){
-
-  time += 0.05;
-
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  const tileW = Math.min(canvas.width, canvas.height)/8;
-  const tileH = tileW/2;
-  const tileZ = tileW/2;
-
-  const reservedTopLayers = 15;
-  const totalLayers = Math.ceil(canvas.height / tileZ);
-  const mapLayer = totalLayers - reservedTopLayers - 1;
-
-  let cubes = [];
-
-  for(let z=0; z<totalLayers; z++){
-    for(let y=0; y<mapRows; y++){
-      for(let x=0; x<mapCols; x++){
-
-        let type = null;
-
-        if(z === mapLayer){
-          type = topMap[y][x];
-        }
-        else if(z < mapLayer){
-          type = 0;
-        }
-        else continue;
-
-        cubes.push({
-          x,y,z,type,
-          depth: x+y+z
-        });
+      if(z === mapLayer){
+        material = landMaterial;
+      }else{
+        const depthRatio = (mapLayer - z)/mapLayer;
+        material = getWaterMaterial(depthRatio);
       }
+
+      const cube = new THREE.Mesh(geometry, material);
+      cube.position.set(x - size/2, z, y - size/2);
+      cube.castShadow = true;
+      cube.receiveShadow = true;
+
+      scene.add(cube);
+      cubes.push({mesh:cube, z});
     }
   }
+}
 
-  cubes.sort((a,b)=>a.depth-b.depth);
+// ===== 水面波動 =====
+let time = 0;
 
-  cubes.forEach(c=>{
-    if(c.type === 1){
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:"#4caf50",
-        left:"#388e3c",
-        right:"#2e7d32"
-      });
-    }else{
+function animate(){
+  requestAnimationFrame(animate);
+  time += 0.03;
 
-      const water = getWaterVisual(c.z, mapLayer);
-
-      let waveOffset = 0;
-
-      if(c.z === mapLayer){
-        const amplitude = tileZ * 0.18;
-        waveOffset = Math.sin(time + c.x*0.6 + c.y*0.6) * amplitude;
-      }
-
-      drawCube(
-        c.x,c.y,c.z,
-        tileW,tileH,tileZ,
-        water.colors,
-        waveOffset,
-        water.alpha
-      );
+  cubes.forEach(obj=>{
+    if(obj.z === mapLayer-1){
+      const x = obj.mesh.position.x;
+      const y = obj.mesh.position.z;
+      obj.mesh.position.y =
+        obj.z +
+        Math.sin(time + x*0.6 + y*0.6)*0.2;
     }
   });
 
-  requestAnimationFrame(render);
+  renderer.render(scene,camera);
 }
 
-render();
+animate();
 </script>
+
 </body>
 </html>
