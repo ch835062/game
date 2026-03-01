@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水族箱最終強化版</title>
+<title>水層+3層版本</title>
 <style>
 body{
   margin:0;
@@ -120,38 +120,6 @@ function getWaterVisual(z, maxDepth, y){
   };
 }
 
-// 🌑 海床高度函數（斜坡＋起伏）
-function getSeabedHeight(x,y){
-  const slope = y * 0.3; // 斜坡
-  const wave = Math.sin(x*0.8) * 0.8 + Math.cos(y*0.6) * 0.5;
-  return Math.floor(slope + wave);
-}
-
-// 🌿 海草
-function drawSeaweed(x,y,z,tileW,tileH,tileZ){
-
-  const pos = isoToScreen(x,y,z,tileW,tileH,tileZ);
-  const centerX = canvas.width/2;
-  const centerY = canvas.height * 0.6;
-
-  const sx = pos.x + centerX;
-  const sy = pos.y + centerY;
-
-  const sway = Math.sin(time*2 + x) * 5;
-
-  ctx.strokeStyle = "rgba(20,120,60,0.8)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - tileZ/2);
-  ctx.quadraticCurveTo(
-    sx + sway,
-    sy - tileZ - 20,
-    sx + sway,
-    sy - tileZ - 40
-  );
-  ctx.stroke();
-}
-
 function render(){
 
   time += 0.05;
@@ -163,43 +131,27 @@ function render(){
 
   const reservedTopLayers = 15;
   const totalLayers = Math.ceil(canvas.height / tileZ);
-  const mapLayer = totalLayers - reservedTopLayers - 1;
+
+  // 🌊 水層增加 3 層
+  const mapLayer = totalLayers - reservedTopLayers - 1 + 3;
 
   let cubes = [];
 
-  for(let y=0; y<mapRows; y++){
-    for(let x=0; x<mapCols; x++){
-
-      const seabedHeight = getSeabedHeight(x,y);
-
-      // 🌑 海床
-      cubes.push({
-        x,y,
-        z: seabedHeight,
-        type:"seabed",
-        depth: x+y+seabedHeight
-      });
-
-      // 🌿 海草
-      if(Math.random() < 0.15){
-        cubes.push({
-          x,y,
-          z: seabedHeight+1,
-          type:"seaweed",
-          depth: x+y+seabedHeight+1
-        });
-      }
-
-      // 🌊 水
-      for(let z=seabedHeight+1; z<mapLayer; z++){
+  for(let z=0; z<mapLayer; z++){
+    for(let y=0; y<mapRows; y++){
+      for(let x=0; x<mapCols; x++){
         cubes.push({
           x,y,z,
           type:"water",
           depth: x+y+z
         });
       }
+    }
+  }
 
-      // 🟩 地圖
+  // 🟩 最上層地圖
+  for(let y=0; y<mapRows; y++){
+    for(let x=0; x<mapCols; x++){
       cubes.push({
         x,y,
         z:mapLayer,
@@ -213,28 +165,15 @@ function render(){
 
   cubes.forEach(c=>{
 
-    if(c.type==="seabed"){
-      const grain = 30 + Math.random()*20;
-      drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
-        top:`hsl(30,40%,${grain}%)`,
-        left:`hsl(30,35%,${grain-10}%)`,
-        right:`hsl(30,35%,${grain-18}%)`
-      });
-    }
-
-    else if(c.type==="seaweed"){
-      drawSeaweed(c.x,c.y,c.z,tileW,tileH,tileZ);
-    }
-
-    else if(c.type==="land"){
+    if(c.type==="land"){
       drawCube(c.x,c.y,c.z,tileW,tileH,tileZ,{
         top:"#4caf50",
         left:"#388e3c",
         right:"#2e7d32"
       });
     }
-
     else{
+
       const water = getWaterVisual(c.z,mapLayer,c.y);
 
       let waveOffset = 0;
